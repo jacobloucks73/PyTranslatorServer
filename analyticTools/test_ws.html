@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <h2>Local WebSocket Test</h2>
+    <input id="msg" placeholder="Type message..." />
+    <button onclick="sendMsg()">Send</button>
+    <pre id="log"></pre>
+    <script>
+  const log = (msg, emoji = "💬") => {
+    document.getElementById("log").innerHTML += `<div>${emoji} ${msg}</div>`;
+  };
+
+  const ws = new WebSocket("ws://127.0.0.1:8000/ws/testsession");
+
+  ws.onopen = () => log("Connected ✅");
+  ws.onmessage = (e) => log("Message: " + e.data, "📨");
+  ws.onerror = (err) => log("Error: " + (err.message || "unknown"), "❌");
+  ws.onclose = () => log("Disconnected ⚠️");
+
+  function sendMsg() {
+    const val = document.getElementById("msg").value;
+    const msg = {
+      source: "client",
+      payload: { english: val }
+    };
+    ws.send(JSON.stringify(msg));
+    log("Sent: " + val, "➡️");
+  }
+</script>
+
+  </body>
+</html>
