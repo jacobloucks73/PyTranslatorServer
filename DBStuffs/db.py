@@ -1,6 +1,6 @@
 import os
 from sqlalchemy.orm import Session
-from models import SessionData
+from models import SessionData, HostSession, ViewerSession, CoClientSession
 from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -29,21 +29,79 @@ def init_db():
 # -------------------------------------------------
 # Create or fetch a session record
 # -------------------------------------------------
-def get_or_create_session(db: Session, session_id: str):
+# def get_or_create_session(db: Session, session_id: str, DB_Type: str):
+#     session = db.query(SessionData).filter(SessionData.session_id == session_id).first()
+#     if not session:
+#
+#         type_map = {
+#             "Host": HostSession,
+#             "CoClient": CoClientSession,
+#             "Viewer": ViewerSession
+#         }
+#
+#         cls = type_map.get(DB_type)
+#         if cls is None:
+#             raise ValueError(f"Unknown session type {DB_type}")
+#
+#         # switch statement for making different types of sessions
+#         if DB_Type == "Host":
+#             session = SessionData(
+#                 session_id=session_id,
+#                 active_session=True,
+#                 last_updated=datetime.utcnow(),
+#                 input_lang="en-US",  #  default input language
+#                 output_lang="English"  #  default output language
+#                )
+#
+#         elif DB_Type == "CoClient":
+#             session = SessionData(
+#                 session_id=session_id,
+#                 active_session=True,
+#                 last_updated=datetime.utcnow(),
+#                 input_lang="en-US",  #  default input language
+#                 output_lang="English"  #  default output language
+#                )
+#
+#
+#         db.add(session)
+#         db.commit()
+#         db.refresh(session)
+#
+#         print(f"Created new active session: {session_id}")
+#
+#     return session
+
+from datetime import datetime
+
+def get_or_create_session(db: Session, session_id: str, DB_Type: str):
     session = db.query(SessionData).filter(SessionData.session_id == session_id).first()
-    if not session:
-        # ✅ ensure session starts active and with timestamps
-        session = SessionData(
-            session_id=session_id,
-            active_session=True,
-            last_updated=datetime.utcnow(),
-            input_lang="en-US",  #  default input language
-            output_lang="English"  #  default output language
-           )
-        db.add(session)
-        db.commit()
-        db.refresh(session)
-        print(f"Created new active session: {session_id}")
+    if session:
+        return session  # already exists → return it
+
+    type_map = {
+        "Host": HostSession,
+        "CoClient": CoClientSession,
+        "Viewer": ViewerSession,
+    }
+
+    cls = type_map.get(DB_Type)
+    if cls is None:
+        raise ValueError(f"Unknown session type '{DB_Type}'. Must be Host, CoClient, or Viewer.")
+
+    # ✅ Create the correct subclass
+    session = cls(
+        session_id=session_id,
+        session_type=DB_Type,        # not required if subclass is set up correctly,
+                                     # but safe to include
+        last_updated=datetime.utcnow(),
+        active_session=True
+    )
+
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    print(f"Created new {DB_Type} session: {session_id}")
     return session
 
 # -------------------------------------------------
