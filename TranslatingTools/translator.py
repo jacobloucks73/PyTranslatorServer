@@ -4,16 +4,22 @@ from DBStuffs.db import SessionLocal, get_or_create_session
 from sqlalchemy import text
 from datetime import datetime
 # from deep_translator import GoogleTranslator
-from google.cloud import translate_v2 as translate # for official google translate, need API key for test run
+from google.cloud import translate_v2 as translate # for official Google Translate, need API key for test run
 from google.oauth2 import service_account
 
-INTERVAL = 1          # seconds between live updates
-CONTEXT_WORDS = 15    # how many words before new chunk for context
-active_sessions = {}
+INTERVAL = 5                # seconds between live updates
+CONTEXT_WORDS = 15          # how many words before new chunk for context
+active_sessions = {}        # idk what this does and im to lazy to look
 
-# Path to your service account credentials
+last_punct_word_index1 = {}  # this and the below are for the periodic translation
+last_punct_word_index2 = {} # nothing like a temp fix that becomes permanent, get new regions quick fix for multi hosts
+last_punct_word_index3 = {}  # this and the below are for handle incoming
+last_punct_word_index4 = {} # nothing like a temp fix that becomes permanent, get new regions quick fix for multi hosts
+
+# Path to service account credentials
 credentials = service_account.Credentials.from_service_account_file(
     'C:/Users/jacob/Downloads/pyserver-476603-8560f519ac75.json' # path to json file with API key for google translate
+    # #TODO make this a relative path for Loveland and server build
 )
 
 # Initialize the Translate client
@@ -54,7 +60,6 @@ translator = translate.Client(credentials=credentials)
 # -------------------------------------------------------
 # Helper: call GooglePaid
 # -------------------------------------------------------
-#
 async def translate_text(session_id: str, text_chunk: str, target_lang: str):
     if not text_chunk.strip():
         return ""
@@ -63,7 +68,7 @@ async def translate_text(session_id: str, text_chunk: str, target_lang: str):
     loop = asyncio.get_event_loop()
 
     # time_block: measure full Google API round trip
-    with time_block(session_id, "translate_text_Google_Paid", f"gcloud_{target_lang}"):
+    with time_block(session_id, "translate_text_Google_Paid", f"gcloud_{target_lang}"): # timing gates, Ignore
         try:
             # Run the blocking Google Translate call in a thread pool
             result = await loop.run_in_executor(
@@ -115,28 +120,45 @@ async def translate_text(session_id: str, text_chunk: str, target_lang: str):
 # Helper: find new words + context
 # -------------------------------------------------------
 
-def get_new_region(session_id: str, full_text: str, last_index: int):
-    # measure splitting text into words
-    with time_block(session_id, "get_new_region", "split"):
+def get_new_region(full_text, session_id,yudodis):
+    """Return the region of text that hasn't yet been punctuated."""
+    with time_block(session_id, "get_new_region", "split_words"):
         words = full_text.strip().split()
 
-    if len(words) <= last_index:
-        return "", last_index  # nothing new
+    # weird ahh if statement loop I know but it works
+    if yudodis == 1:
 
-    # measure building the "region" window
-    with time_block(session_id, "get_new_region", "window_build"):
-        start_idx = max(0, last_index - CONTEXT_WORDS)
-        region = " ".join(words[start_idx:])
+        start_index = last_punct_word_index1.get(session_id, 0)
+
+    elif yudodis == 2:
+
+        start_index = last_punct_word_index2.get(session_id, 0)
+
+    elif yudodis == 3:
+
+        start_index = last_punct_word_index3.get(session_id, 0)
+
+    elif yudodis == 4:
+
+        start_index = last_punct_word_index4.get(session_id, 0)
+
+    else:
+        print(f"getting here shouldnt be possible : ( : {yudodis}")
+
+    if len(words) <= start_index:
+        return "", start_index
+
+    with time_block(session_id, "get_new_region", "compute_region"):
+        context_start = max(0, start_index - CONTEXT_WORDS)
+        region = " ".join(words[context_start:])
         new_index = len(words)
-
     return region, new_index
-
 
 # -------------------------------------------------------
 # Helper: replace overlapping section
 # -------------------------------------------------------
 def replace_section(session_id: str, old_text: str, new_text: str, overlap_words: int):
-    with time_block(session_id, "replace_section", "splice"):
+    with time_block(session_id, "replace_section", "splice"): # timing gates, Ignore
         old_words = old_text.strip().split()
         if overlap_words > len(old_words):
             overlap_words = len(old_words)
@@ -153,80 +175,162 @@ def replace_section(session_id: str, old_text: str, new_text: str, overlap_words
 async def translator_session(session_id: str):
     uri = f"ws://127.0.0.1:8000/ws/{session_id}"
 
-    last_translated_index = 0
-    last_punct_index = 0
-    live_translation = ""
-    punct_translation = ""
-
     async with websockets.connect(uri) as ws:
         print(f"🌎 Translator connected for session {session_id}")
-
+        # TODO find out why Periodic translations arent going through like periodic punctuates, either get rid of and just do punctuates and translates or vice versa Level 3
         async def periodic_translation():
-            nonlocal last_translated_index
             while True:
                 # 1. Read DB state (english transcript, targets, existing translations)
-                with time_block(session_id, "periodic_translation", "db_read"):
+                with time_block(session_id, "periodic_translation", "db_read"): # timing gates, Ignore
                     db = SessionLocal()
                     try:
-                        session = get_or_create_session(db, session_id)
-                        english_text = (session.english_transcript or "").strip()
-                        targets = dict(session.translation_targets or {})          # {"es": True, ...}
-                        current_translations = dict(session.translations or {})    # {"es": "...", ...}
+                        session = get_or_create_session(db, session_id, "Translator_first_call") # TODO  figure out how to get a DB type here to init the stuff. or if it never inits, create seperate get session method in db.py
+
+                        #TODO get DB_type and use it to integrate the dual client translate feature working with a few if statements
+
+                        SessionType = (session.session_type or "").strip()  # gets session type for use in later calls to DB and Websocket
+
+                        if SessionType == "Client":  # if the session is a single client, do normal shit and things
+
+                            english_text = (session.english_transcript or "").strip() #  input text already in the DB, doesnt have to be english
+                            targets = dict(session.translation_targets or {})         # TODO : LEVEL 3 : has to be a better way to do this, list of active translation targets, currently never gets revised after the language ends use
+                            current_translations = dict(session.translations or {})   # list of translation texts from the translation list
+
+                        elif SessionType == "CoClient":  # if the session is a dual client, do unnormal shit and things
+
+                            Host_1_Input    = (session.Host1_in_transcript or "").strip()   # gets Host Input text 1 from DB
+                            Host_2_Input    = (session.Host2_in_transcript or "").strip()   # gets Host input text 2 from DB
+                            Host_1_Output    = (session.Host1_out_transcript or "").strip() # gets Host output text 1 from DB
+                            Host_2_Output    = (session.Host2_out_transcript or "").strip() # gets Host output text 2 from DB
+                            # Host_1_In_Lang  = (session.Host1_lang_in or "en")             # gets the first hosts spoken language, might be useful later
+                            # Host_2_In_Lang  = (session.Host2_lang_in or "es")             # gets the second hosts spoken language, might be useful later
+                            Host_1_Out_Lang = (session.Host1_lang_out or "es")              # gets the first hosts translated language (what host 1 wants to see on their screen)
+                            Host_2_Out_Lang = (session.Host2_lang_out or "en")              # gets the second hosts translated language (what host 2 wants to see on their screen)
+
+                        else:
+                            print(f"the fuck did you enter? {SessionType}")
+                            return
+
                     finally:
                         db.close()
 
                 # 2. Figure out what's new to translate
-                with time_block(session_id, "periodic_translation", "region_extract"):
-                    region, new_index = get_new_region(session_id, english_text, last_translated_index)
+                with time_block(session_id, "periodic_translation", "region_extract"): # timing gates, Ignore
 
-                # no new words? skip
-                if new_index == last_translated_index:
-                    await asyncio.sleep(INTERVAL)
-                    continue
+                    if SessionType == "CoClient":
+                        region1, new_index_Host1 = get_new_region(Host_1_Input, session_id,1)    # gets region of new punctuation for host 1
+                        region2, new_index_Host2 = get_new_region(Host_2_Input, session_id,2)   # gets region of new punctuation for host 2
+
+                    elif SessionType == "Client":
+                        region, new_index = get_new_region(english_text, session_id,1)           # gets region of new punctuation for single host
+
+                    else:
+                        print(f"the fuck did you enter? {SessionType}")
+                        return
+
+                    if not region and region1 and region2:
+                        return
+
+                    # await asyncio.sleep(INTERVAL) # what is this and why was it here before the dual host conversion?
+                    # continue
 
                 # 3. Translate into each active language
-                for lang_code, is_active in targets.items():
-                    if not is_active:
-                        continue
+                if SessionType == "Client":
 
-                    # translation call
-                    with time_block(session_id, "periodic_translation", f"translate_{lang_code}"):
-                        #print("383 : set to translate" + region)
-                        translated = await translate_text(session_id, region, lang_code)
+                    for lang_code, is_active in targets.items():
+                        if not is_active:
+                            continue
 
-                    # stitch into rolling transcript + broadcast
-                    with time_block(session_id, "periodic_translation", f"replace_send_{lang_code}"):
-                        prev_txt = current_translations.get(lang_code, "")
-                        updated_txt = replace_section(session_id, prev_txt, translated, CONTEXT_WORDS)
-                        current_translations[lang_code] = updated_txt
+                        # translation call
+                        with time_block(session_id, "periodic_translation", f"translate_{lang_code}"): # timing gates, Ignore
 
-                        await ws.send(json.dumps({
-                            "source": "translate",
-                            "payload": {"lang": lang_code, "translated": updated_txt}
-                        }))
+                            translated = await translate_text(session_id, region, lang_code)
+
+                        # stitch into rolling transcript + broadcast
+                        with time_block(session_id, "periodic_translation", f"replace_send_{lang_code}"): # timing gates, Ignore
+
+                            prev_txt = current_translations.get(lang_code, "")
+                            updated_txt = replace_section(session_id, prev_txt, translated, CONTEXT_WORDS) # TODO might be a cause of concern in the long run
+                            current_translations[lang_code] = updated_txt
+
+                            await ws.send(json.dumps({ # send bullshit to the bullshit frontend
+                                "source": "translate",
+                                "payload": {"lang": lang_code, "translated": updated_txt, "sessionID": session_id} # TODO make the frontend match this, make it match SessionIDs
+                            }))
+
+                elif SessionType == "CoClient":
+
+                    translated_host_2_out = await translate_text(session_id, region1, Host_2_Out_Lang) # translated text for Host 2's output
+                    translated_host_1_out = await translate_text(session_id, region2, Host_1_Out_Lang) # translated text for Host 1's output
+
+                    updated_txt_Host_1 = replace_section(session_id, Host_1_Output, translated_host_1_out, CONTEXT_WORDS)  # TODO might be a cause of concern in the long run
+                    updated_txt_Host_2 = replace_section(session_id, Host_2_Output, translated_host_2_out, CONTEXT_WORDS)  # TODO might be a cause of concern in the long run
+
+                    await ws.send(json.dumps({ # send bullshit to the bullshit frontend
+                        "source": "translate",
+                        "payload": {"translated_Host_1":  updated_txt_Host_1, "translated_Host_2":  updated_txt_Host_2, "sessionID": session_id}
+                        # TODO make the frontend match this, make it match SessionIDs
+                    }))
+
+                else:
+
+                    print(f"the fuck did you enter? {SessionType}")
+                    return
+
 
                 # 4. Commit updated translations back to DB
-                with time_block(session_id, "periodic_translation", "commit"):
-                    db = SessionLocal()
-                    try:
-                        s = get_or_create_session(db, session_id)
-                        s.translations = current_translations
-                        db.commit()
-                    finally:
-                        db.close()
+                with time_block(session_id, "periodic_translation", "commit"): # timing gates, Ignore
 
-                # 5. Advance pointer so we don't re-translate the same text
-                last_translated_index = new_index
+                    db = SessionLocal()
+
+                    if SessionType == "Client":
+
+                        try:
+                            session = get_or_create_session(db, session_id, "Translate_Client_Call") # change to get session method
+                            session.translations = current_translations
+                            db.commit()
+
+                        finally:
+                            db.close()
+
+                    elif SessionType == "CoClient":
+
+                        try:
+                            session = get_or_create_session(db, session_id, "Translate_CoClient_Call")
+                            session.Host1_out_transcript = updated_txt_Host_1
+                            session.Host2_out_transcript = updated_txt_Host_2
+                            db.commit()
+
+                        finally:
+                            db.close()
+
+                    else:
+                        print(f"the fuck did you enter? {SessionType}")
+                        return
+
+                if SessionType == "Client":
+
+                    last_punct_word_index1[session_id] = new_index  # last index for single host gets saved as such
+
+                elif SessionType == "CoClient":
+
+                    last_punct_word_index1[session_id] = new_index_Host1  # last index for host 1 gets saved as such
+                    last_punct_word_index2[session_id] = new_index_Host2  # last index for host 2 gets saved as such
+
+                else:
+
+                    print(f"the fuck did you enter? {SessionType}")
+                    return
 
                 # 6. Sleep until next cycle
                 await asyncio.sleep(INTERVAL)
 
         async def handle_incoming():
-            nonlocal last_punct_index, punct_translation, live_translation, last_translated_index
+            # nonlocal last_punct_index, punct_translation, live_translation, last_translated_index
 
             while True:
-                # wait for downstream events (like punctuate)
-                with time_block(session_id, "handle_incoming", "recv_ws"):
+                # wait for punctuate call
+                with time_block(session_id, "handle_incoming", "recv_ws"): # timing gates, Ignore
                     msg = json.loads(await ws.recv())
 
                 if msg.get("source") != "punctuate":
@@ -234,63 +338,162 @@ async def translator_session(session_id: str):
                     continue
 
                 # pull punctuated english from message
-                english_punct = msg["payload"].get("english_punctuated", "")
-                words = english_punct.strip().split()
-                if len(words) <= last_punct_index:
-                    continue
+                english_punct = msg["payload"].get("english_punctuated", "") # get single client text region
+
+                if english_punct == "": # if the message is a dual client
+
+                    Host_1_Punctuated = msg["payload"].get("Host_1_punctuated", "")
+                    Host_2_Punctuated = msg["payload"].get("Host_2_punctuated", "")
+                    SessionType = "CoClient" # we know the message is a coclient at this point
+
+                    if not Host_1_Punctuated and Host_2_Punctuated:
+
+                        print("ERROR : how the fuck you get here? ")
+                        return
+
+                else:
+
+                    SessionType = "Client"  # we know the message is a single host client at this point
 
                 # find delta of punctuated region
-                with time_block(session_id, "handle_incoming", "get_region_punctuated"):
-                    region, new_index = get_new_region(session_id, english_punct, last_punct_index)
+                with time_block(session_id, "handle_incoming", "get_region_punctuated"): # timing gates, Ignore
 
-                # no new meaningful text? skip
-                if new_index == last_translated_index:
-                    await asyncio.sleep(INTERVAL)
-                    continue
+                    if SessionType == "CoClient":
 
-                # update the punct index so we don't resend
-                last_punct_index = new_index
+                        region1, new_index_Host1 = get_new_region(Host_1_Punctuated, session_id, 3)  # gets region of new punctuation for host 1
+                        region2, new_index_Host2 = get_new_region(Host_2_Punctuated, session_id,4)  # gets region of new punctuation for host 2
+
+                    elif SessionType == "Client":
+
+                        region, new_index = get_new_region(english_punct, session_id,3)  # gets region of new punctuation for single host
+
+                    else:
+
+                        print(f"ERROR : the fuck did you enter? {SessionType}")
+                        return
+
+                    if not region and region1 and region2:
+
+                        print(f"ERROR : the fuck did you enter? {region} + {region1} + {region2}")
+                        return
+
+                # the fuck is this bullshit?
+                # if new_index == last_translated_index:
+                #     await asyncio.sleep(INTERVAL)
+                #     continue
 
                 # reload DB targets + translations
-                with time_block(session_id, "handle_incoming", "db_read_again"):
+                with time_block(session_id, "handle_incoming", "db_read_again"): # timing gates, Ignore
                     db = SessionLocal()
                     try:
-                        session = get_or_create_session(db, session_id)
-                        targets = dict(session.translation_targets or {})
-                        current_translations = dict(session.translations or {})
+
+                        session = get_or_create_session(db, session_id, "Translate_handle_incoming")
+
+                        if SessionType == "Client":
+
+                            targets = dict(session.translation_targets or {})
+                            current_translations = dict(session.translations or {})
+
+                        elif SessionType == "CoClient":
+
+                            # Host_1_Input = (session.Host1_in_transcript or "").strip()  # gets Host Input text 1 from DB
+                            # Host_2_Input = (session.Host2_in_transcript or "").strip()  # gets Host input text 2 from DB
+                            Host_1_Output = (session.Host1_out_transcript or "").strip()  # gets Host output text 1 from DB
+                            Host_2_Output = (session.Host2_out_transcript or "").strip()  # gets Host output text 2 from DB
+                            # Host_1_In_Lang  = (session.Host1_lang_in or "en")             # gets the first hosts spoken language, might be useful later
+                            # Host_2_In_Lang  = (session.Host2_lang_in or "es")             # gets the second hosts spoken language, might be useful later
+                            Host_1_Out_Lang = (session.Host1_lang_out or "es")  # gets the first hosts translated language (what host 1 wants to see on their screen)
+                            Host_2_Out_Lang = (session.Host2_lang_out or "en")  # gets the second hosts translated language (what host 2 wants to see on their screen)
+
+                        else:
+
+                            print(f"the fuck did you enter? {SessionType}")
+                            return
+
                     finally:
                         db.close()
 
-                # translate this punctuated region into each active target language
-                for lang_code, is_active in targets.items():
-                    if not is_active:
-                        continue
+                if SessionType == "Client":
 
-                    with time_block(session_id, "handle_incoming", f"translate_punct_{lang_code}"):
-                        prev_txt = current_translations.get(lang_code, "")
-                       #+ print ("459 : set to translate" +  region)
-                        translated = await translate_text(session_id, region, lang_code)
-                        updated_txt = replace_section(session_id, prev_txt, translated, CONTEXT_WORDS)
-                        current_translations[lang_code] = updated_txt
+                    for lang_code, is_active in targets.items():
 
-                        # push back out to clients
-                        await ws.send(json.dumps({
-                            "source": "translate",
-                            "payload": {"lang": lang_code, "translated": updated_txt}
-                        }))
+                        if not is_active:
 
-                # persist post-punctuation translations
-                with time_block(session_id, "handle_incoming", "commit_punctuated"):
-                    db = SessionLocal()
+                            continue
+
+                        with time_block(session_id, "handle_incoming", f"translate_punct_{lang_code}"):    # timing gates, Ignore
+
+                            prev_txt = current_translations.get(lang_code, "")                             # gets the full text from db
+                            translated = await translate_text(session_id, region, lang_code)               # actual translate
+                            updated_txt = replace_section(session_id, prev_txt, translated, CONTEXT_WORDS) # TODO look at this to find if it is fucking up
+                            current_translations[lang_code] = updated_txt                                  # updates DB
+
+                            # push back out to clients
+                            await ws.send(json.dumps({
+                                "source": "translate",
+                                "payload": {"lang": lang_code, "translated": updated_txt}
+                            }))
+
+
+                elif SessionType == "CoClient":
+
+                    translated_host_2_out = await translate_text(session_id, region1, Host_2_Out_Lang) # translated text for Host 2's output
+                    translated_host_1_out = await translate_text(session_id, region2, Host_1_Out_Lang) # translated text for Host 1's output
+
+                    updated_txt_Host_1 = replace_section(session_id, Host_1_Output, translated_host_1_out, CONTEXT_WORDS)  # TODO might be a cause of concern in the long run
+                    updated_txt_Host_2 = replace_section(session_id, Host_2_Output, translated_host_2_out, CONTEXT_WORDS)  # TODO might be a cause of concern in the long run
+
+                    await ws.send(json.dumps({ # send bullshit to the bullshit frontend
+                        "source": "translate",
+                        "payload": {"translated_Host_1":  updated_txt_Host_1, "translated_Host_2":  updated_txt_Host_2, "sessionID": session_id}
+                        # TODO make the frontend match this, make it match SessionIDs
+                    }))
+
+                else:
+
+                    print(f"the fuck did you enter? {SessionType}")
+                    return
+
+                db = SessionLocal()
+
+                if SessionType == "Client":
+
                     try:
-                        s = get_or_create_session(db, session_id)
-                        s.translations = current_translations
+                        session = get_or_create_session(db, session_id, "Translate_Client_Call")  # change to get session method
+                        session.translations = current_translations
                         db.commit()
+
                     finally:
                         db.close()
 
-                # keep our main pointer in sync with new_index so periodic loop won't re-translate
-                last_translated_index = new_index
+                elif SessionType == "CoClient":
+
+                    try:
+                        session = get_or_create_session(db, session_id, "Translate_CoClient_Call")
+                        session.Host1_out_transcript = updated_txt_Host_1
+                        session.Host2_out_transcript = updated_txt_Host_2
+                        db.commit()
+
+                    finally:
+                        db.close()
+
+                else:
+                    print(f"the fuck did you enter? {SessionType}")
+                    return
+
+                if SessionType == "Client":
+
+                    last_punct_word_index3[session_id] = new_index  # last index for single host gets saved as such
+
+                elif SessionType == "CoClient":
+
+                    last_punct_word_index3[session_id] = new_index_Host1  # last index for host 1 gets saved as such
+                    last_punct_word_index4[session_id] = new_index_Host2  # last index for host 2 gets saved as such
+
+                else:
+
+                    print(f"the fuck did you enter? {SessionType}")
+                    return
 
         await asyncio.gather(periodic_translation(), handle_incoming())
 
@@ -298,7 +501,7 @@ async def translator_session(session_id: str):
 async def safe_translator_session(sid):
     try:
         db = SessionLocal()
-        get_or_create_session(db, sid)
+        get_or_create_session(db, sid, "safe_translator")
         db.close()
         await translator_session(sid)
     except Exception as e:
@@ -313,30 +516,30 @@ async def safe_translator_session(sid):
 # -------------------------------------------------------
 async def manager_loop():
     while True:
-        # gather list of sessions that have any english text
-        with time_block("manager", "manager_loop", "query_sessions"):
+
+        with time_block("manager", "manager_loop", "query_sessions"): # timing gates, Ignore
             db = SessionLocal()
             results = db.execute(
-                text("SELECT session_id FROM sessions WHERE english_transcript != ''")
+                text("SELECT session_id, last_updated FROM sessions WHERE english_transcript != '' AND active_session = TRUE")
+            ).fetchall()
+            resultsDos = db.execute(
+                text("SELECT session_id, last_updated FROM sessions WHERE Host2_in_transcript != '' AND Host1_in_transcript != '' AND active_session = TRUE;")
             ).fetchall()
             db.close()
 
-        session_ids = []
-        for row in results:
-            if isinstance(row, (tuple, list)):
-                session_ids.append(row[0])
-            elif hasattr(row, "_mapping"):
-                session_ids.append(row._mapping.get("session_id"))
-            else:
-                session_ids.append(str(row))
+            for SessionID, LastUpdated in results:
+                print("session ID : " + SessionID + ". last updated : " + LastUpdated)
+                # TODO get periodic translation working by adding logic here to continue filtering session data by cutoff time
+                # if last updated = current - 60 secs, make inactive
+                # then call periodic translator here
+            for SessionID, LastUpdated in results:
+                print("session ID : " + SessionID + ". last updated : " + LastUpdated)
+                # TODO get periodic translation working by adding logic here to continue filtering session data by cutoff time
+                # if last updated = current - 60 secs, make inactive
+                # then call periodic translator here
 
-        # for each session, ensure we have a running translator task
-        for sid in session_ids:
-            if sid not in active_sessions:
-                task = asyncio.create_task(safe_translator_session(sid))
-                active_sessions[sid] = task
 
-        await asyncio.sleep(10)
+        await asyncio.sleep(INTERVAL)
 
 
 if __name__ == "__main__":

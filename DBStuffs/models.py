@@ -24,7 +24,7 @@ class SessionData(Base):
 
 
 class HostSession(SessionData):
-    __mapper_args__ = {"polymorphic_identity": "Host"}
+    __mapper_args__ = {"polymorphic_identity": "Client"}
 
     english_transcript    = Column(Text, default="")
     punctuated_transcript = Column(Text, default="")
@@ -40,12 +40,12 @@ class CoClientSession(SessionData):
 
     Host1_in_transcript = Column(Text, default="")   #   init the transcript for the spoken transcript on host 1
     Host2_in_transcript = Column(Text, default="")   #   init the transcript for the spoken transcript on host 2
-    Host1_out_transcript = Column(Text, default="")  #   init the transcript for the translated transcript on host 1
-    Host2_out_transcript = Column(Text, default="")  #   init the transcript for the translated transcript on host 2
+    Host1_out_transcript = Column(Text, default="")  #   init the transcript for the translated transcript on host 1 (what host 1 wants to see on their screen)
+    Host2_out_transcript = Column(Text, default="")  #   init the transcript for the translated transcript on host 2 (what host 2 wants to see on their screen)
     Host1_lang_in = Column(Text, default="en")       #   english default for host 1 input language
     Host2_lang_in = Column(Text, default="es")       #   spanish default for host 2 input language
-    Host1_lang_out = Column(Text, default="es")      #   english default for host 1 output language
-    Host2_lang_out = Column(Text, default="en")      #   spanish default for host 2 output language
+    Host1_lang_out = Column(Text, default="es")      #   english default for host 1 output language (what host 1 wants to see on their screen)
+    Host2_lang_out = Column(Text, default="en")      #   spanish default for host 2 output language (what host 2 wants to see on their screen)
 
 
 class ViewerSession(SessionData):

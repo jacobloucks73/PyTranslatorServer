@@ -1,7 +1,6 @@
 import os
 from sqlalchemy.orm import Session
 from models import SessionData, HostSession, ViewerSession, CoClientSession
-from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from models import Base
@@ -26,60 +25,15 @@ def init_db():
     print("Database initialized (tables ensured).")
     #  creates tables if they don't exist
 
-# -------------------------------------------------
-# Create or fetch a session record
-# -------------------------------------------------
-# def get_or_create_session(db: Session, session_id: str, DB_Type: str):
-#     session = db.query(SessionData).filter(SessionData.session_id == session_id).first()
-#     if not session:
-#
-#         type_map = {
-#             "Host": HostSession,
-#             "CoClient": CoClientSession,
-#             "Viewer": ViewerSession
-#         }
-#
-#         cls = type_map.get(DB_type)
-#         if cls is None:
-#             raise ValueError(f"Unknown session type {DB_type}")
-#
-#         # switch statement for making different types of sessions
-#         if DB_Type == "Host":
-#             session = SessionData(
-#                 session_id=session_id,
-#                 active_session=True,
-#                 last_updated=datetime.utcnow(),
-#                 input_lang="en-US",  #  default input language
-#                 output_lang="English"  #  default output language
-#                )
-#
-#         elif DB_Type == "CoClient":
-#             session = SessionData(
-#                 session_id=session_id,
-#                 active_session=True,
-#                 last_updated=datetime.utcnow(),
-#                 input_lang="en-US",  #  default input language
-#                 output_lang="English"  #  default output language
-#                )
-#
-#
-#         db.add(session)
-#         db.commit()
-#         db.refresh(session)
-#
-#         print(f"Created new active session: {session_id}")
-#
-#     return session
-
 from datetime import datetime
 
 def get_or_create_session(db: Session, session_id: str, DB_Type: str):
-    session = db.query(SessionData).filter(SessionData.session_id == session_id).first()
+    session = db.query(SessionData).filter(SessionData.session_id == session_id).first() # the fuck is this error?
     if session:
         return session  # already exists → return it
 
     type_map = {
-        "Host": HostSession,
+        "Client": HostSession,
         "CoClient": CoClientSession,
         "Viewer": ViewerSession,
     }
@@ -108,7 +62,7 @@ def get_or_create_session(db: Session, session_id: str, DB_Type: str):
 # Append English text instead of overwriting
 # -------------------------------------------------
 def update_english(db: Session, session_id: str, new_text: str):
-    session = get_or_create_session(db, session_id)
+    session = get_or_create_session(db, session_id, DB_Type="Client")
     if session.english_transcript:
         session.english_transcript += " " + new_text.strip()
     else:
@@ -120,10 +74,10 @@ def update_english(db: Session, session_id: str, new_text: str):
     db.commit()
 
 # -------------------------------------------------
-# Append translation per language
+# Append translation per language for single Host / Viewer sessions
 # -------------------------------------------------
 def update_translation(db: Session, session_id: str, lang: str, text: str):
-    session = get_or_create_session(db, session_id)
+    session = get_or_create_session(db, session_id, DB_Type= "Client")
     translations = session.translations or {}
 
     if translations.get(lang):
@@ -138,8 +92,8 @@ def update_translation(db: Session, session_id: str, lang: str, text: str):
 # -------------------------------------------------
 # Append punctuated transcript (not overwrite)
 # -------------------------------------------------
-async def update_punctuated(db: Session, session_id: str, text: str):
-    session = get_or_create_session(db, session_id)
+async def update_punctuated(db: Session, session_id: str, text: str, DB_type: str):
+    session = get_or_create_session(db, session_id, DB_Type= DB_type)  #  TODO add the CoClient pathway to the punctuator.py file to be able to see the DB to see if it is a CoClient or not
     if session.punctuated_transcript:
         session.punctuated_transcript += " " + text.strip()
     else:
@@ -158,7 +112,7 @@ async def update_punctuated(db: Session, session_id: str, text: str):
         }))
 
 def update_flag(db: Session, session_id: str, choser:int, flag:bool):
-    session = get_or_create_session(db, session_id)
+    session = get_or_create_session(db, session_id, "update_flag")
     if choser == 1 and session.active_session:
         session.active_session = flag
     elif choser == 2 and session.archived_FLAG:
@@ -170,7 +124,7 @@ def update_flag(db: Session, session_id: str, choser:int, flag:bool):
     db.commit()
 
 def update_translation_target(db: Session, session_id: str, lan:str, flag:bool):
-    session = get_or_create_session(db, session_id)
+    session = get_or_create_session(db, session_id, "update_translation_target")
     if   lan == "en":
         session.translation_targets.update({"en": flag})
         print(f"english language selected with flag: {flag} for session ID: {session_id}")
@@ -200,7 +154,7 @@ def update_translation_target(db: Session, session_id: str, lan:str, flag:bool):
     db.commit()
 
 def update_host_prefs(db: Session, session_id: str, choser: int, lan:str):
-     session = get_or_create_session(db, session_id)
+     session = get_or_create_session(db, session_id,"update_host_prefs")
      if   choser == 1 and lan != "":
          session.input_lang = lan
      elif choser == 2 and lan != "":
@@ -209,3 +163,55 @@ def update_host_prefs(db: Session, session_id: str, choser: int, lan:str):
      session.last_updated = datetime.utcnow()
      session.active_session = True
      db.commit()
+
+def update_CoClient_Lang(db: Session, session_id: str, Input_Lang: str,Output_Lang: str, Client_Num: int):
+
+    session = get_or_create_session(db, session_id, "Co-Client_Input")
+
+    if Client_Num == 1:
+
+        if Input_Lang != "":
+
+            session.Host1_lang_in = Input_Lang
+
+        if Output_Lang != "":
+
+            session.Host1_lang_in = Output_Lang
+
+
+    if Client_Num == 2:
+
+        if Input_Lang != "":
+            session.Host2_lang_in = Input_Lang
+
+        if Output_Lang != "":
+
+            session.Host2_lang_in = Output_Lang
+
+    else:
+
+        print(f"the fuck did you enter? {Client_Num}")
+        return
+
+    session.active_session = True
+    db.commit()
+
+def update_CoClient_Input(db: Session, session_id: str, Input_Text: str, Client_Num: int):
+
+    session = get_or_create_session(db, session_id, "Co-Client_Input")
+
+    if Client_Num == 1:
+
+        session.Host1_in_transcript = Input_Text
+
+    elif Client_Num == 2:
+
+        session.Host2_in_transcript = Input_Text
+
+    else:
+
+        print(f"the fuck did you enter? {Client_Num}")
+        return
+
+    session.active_session = True
+    db.commit()
