@@ -120,7 +120,7 @@ async def translate_text(session_id: str, text_chunk: str, target_lang: str):
 # Helper: find new words + context
 # -------------------------------------------------------
 
-def get_new_region(full_text, session_id,yudodis):
+def get_new_region(full_text, session_id, yudodis):
     """Return the region of text that hasn't yet been punctuated."""
     with time_block(session_id, "get_new_region", "split_words"):
         words = full_text.strip().split()
@@ -146,7 +146,7 @@ def get_new_region(full_text, session_id,yudodis):
         print(f"getting here shouldnt be possible : ( : {yudodis}")
 
     if len(words) <= start_index:
-        return "", start_index
+        return "",   start_index
 
     with time_block(session_id, "get_new_region", "compute_region"):
         context_start = max(0, start_index - CONTEXT_WORDS)

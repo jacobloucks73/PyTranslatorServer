@@ -109,7 +109,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
                 await manager.broadcast(session_id, msg)
 
-            if source == "CoClient":
+            elif source == "CoClient":
 
                 with time_block(session_id, "CoClient", "update_english"):
 
@@ -125,6 +125,17 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                        update_CoClient_Input(db, session_id, Input_Text, Client_Num) # TODO add Update_CoClient_Input method to db.py to update backend with Host_Num 1 being host 1 etc...
 
                 await manager.broadcast(session_id, msg)
+
+            elif source == "Viewer":
+
+
+
+                return #TODO LEVEL 7 :::  make the logic for the viewer connecting to the session -
+                       #TODO and any other details needed for the user not already defined in the client section
+
+            elif source == "disconnect":
+
+                return #TODO LEVEL 5 ::: make the logic for all sessions disconnects
 
             # --- TRANSLATION UPDATE ---
             elif source == "translate":
