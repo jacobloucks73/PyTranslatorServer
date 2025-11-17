@@ -77,7 +77,7 @@ async def punctuate(session_id: str):
         SessionType = (session.session_type or "").strip()        # gets session type for use in later calls to DB and Websocket
 
         if SessionType == "Client": # if bitches want to party alone
-
+            print("1")
             english_text = (session.english_transcript or "").strip() # gets english text from DB
 
             if not english_text:
@@ -112,7 +112,7 @@ async def punctuate(session_id: str):
                 return
 
         elif SessionType == "Client":
-
+            print("2")
             region, new_index = get_new_region(english_text, session_id)         # gets region of new punctuation for single host
 
             if not region.strip():
@@ -140,6 +140,7 @@ async def punctuate(session_id: str):
                     punctuated_region2 = model.restore_punctuation(region2)  # brains for punctuating host 2s region
 
                 elif SessionType == "Client":
+                    print("3")
                     punctuated_region = model.restore_punctuation(region)  # brains for punctuating single host region
 
                 else:
@@ -155,9 +156,15 @@ async def punctuate(session_id: str):
         with time_block(session_id, "punctuate", "ws_send_punctuated"): # timing gates, Ignore
 
             if SessionType == "Client": # send websocket to single client
+                print("4")
                 await ws.send(json.dumps({
                     "source": "punctuate",
                     "payload": {"english_punctuated": punctuated_region, "sessionID": session_id}
+                }))
+
+                await ws.send(json.dumps({
+                    "source": "punctuate",
+                    "payload": {"english_punctuated": punctuated_region, "sessionID": f"{session_id}1"}
                 }))
 
             elif SessionType == "CoClient":
@@ -180,6 +187,7 @@ async def punctuate(session_id: str):
         print(f" Unlocked writes for {session_id}")
 
     if SessionType == "Client":
+        print("5")
         last_punct_word_index[session_id] = new_index # last index for single host gets saved as such
 
     elif SessionType == "CoClient":

@@ -82,7 +82,7 @@ manager = ConnectionManager()
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     db = SessionLocal()
-    # global IS_PUNCTUATING # make session specific
+    global IS_PUNCTUATING # make session specific
 
     try:
 
@@ -107,7 +107,6 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     if IS_PUNCTUATING: # TODO ::: LEVEL 3 ::: make session specific maybe an array?
 
                         BUFFER_STORE[session_id] = BUFFER_STORE.get(session_id, "") + " " + english_text # WTF does this even do
-
 
                     update_english(db, session_id, english_text)
 

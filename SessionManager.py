@@ -11,6 +11,8 @@ class SessionManager:
         # lock to avoid race conditions
         self.lock = asyncio.Lock()
 
+        session_manager = SessionManager()
+
     async def register(self, session_id: str, websocket):
         async with self.lock:
             if session_id not in self.active_sessions:
