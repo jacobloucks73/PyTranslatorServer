@@ -87,7 +87,7 @@ async def translate_text(session_id: str, text_chunk: str, target_lang: str):
 
         except Exception as e:
             print(f"❌ Translation error: {e}")
-            return ""
+            return
 
 # -------------------------------------------------------
 # Helper: call GoogleFree
@@ -122,6 +122,7 @@ async def translate_text(session_id: str, text_chunk: str, target_lang: str):
 
 def get_new_region(full_text, session_id, yudodis):
     """Return the region of text that hasn't yet been punctuated."""
+    global start_index
     with time_block(session_id, "get_new_region", "split_words"):
         words = full_text.strip().split()
 
@@ -143,7 +144,7 @@ def get_new_region(full_text, session_id, yudodis):
         start_index = last_punct_word_index4.get(session_id, 0)
 
     else:
-        print(f"getting here shouldnt be possible : ( : {yudodis}")
+        print(f"getting here shouldn't be possible : ( : {yudodis}")
 
     if len(words) <= start_index:
         return "",   start_index
@@ -179,6 +180,7 @@ async def translator_session(session_id: str):
         print(f"🌎 Translator connected for session {session_id}")
         # TODO find out why Periodic translations arent going through like periodic punctuates, either get rid of and just do punctuates and translates or vice versa Level 3
         async def periodic_translation():
+            global updated_txt_Host_1, updated_txt_Host_2
             while True:
                 # 1. Read DB state (english transcript, targets, existing translations)
                 with time_block(session_id, "periodic_translation", "db_read"): # timing gates, Ignore
@@ -328,6 +330,7 @@ async def translator_session(session_id: str):
         async def handle_incoming():
             # nonlocal last_punct_index, punct_translation, live_translation, last_translated_index
 
+            global Host_2_Punctuated, Host_1_Punctuated
             while True:
                 # wait for punctuate call
                 with time_block(session_id, "handle_incoming", "recv_ws"): # timing gates, Ignore

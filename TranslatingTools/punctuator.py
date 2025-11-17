@@ -67,6 +67,7 @@ def get_new_region2(full_text, session_id):
 ##
 
 async def punctuate(session_id: str):
+
     """Runs punctuation on the new text delta and sends results to WebSocket."""
     with time_block(session_id, "punctuate", "db_read"): # timing gates, Ignore
 
@@ -76,36 +77,49 @@ async def punctuate(session_id: str):
         SessionType = (session.session_type or "").strip()        # gets session type for use in later calls to DB and Websocket
 
         if SessionType == "Client": # if bitches want to party alone
+
             english_text = (session.english_transcript or "").strip() # gets english text from DB
 
+            if not english_text:
+                print(f"⚠️ No text to punctuate for {session_id}")
+                return
+
         elif SessionType == "CoClient": # if bitches want to party with someone else
+
             Host_1_Input = (session.Host1_in_transcript or "").strip() # gets Host Input 1 from DB
             Host_2_Input = (session.Host2_in_transcript or "").strip()  # gets Host input 2 from DB
 
+            if not Host_1_Input.strip() and not Host_2_Input.strip():
+                print(f"⚠️ No text to punctuate for {session_id}")
+                return
+
         else:
+
             print(f"the fuck did you enter? {SessionType}")
             return
 
         db.close() # after path has been chosen, close DB
 
-    if not Host_1_Input and Host_2_Input and english_text: # if no input for host 1, 2, or single client, return
-        print(f"⚠️ No text to punctuate for {session_id}")
-        return
 
     with time_block(session_id, "punctuate", "get_region"): # timing gates, Ignore
 
         if SessionType == "CoClient":
+
             region1, new_index_Host1 = get_new_region(Host_1_Input, session_id)  # gets region of new punctuation for host 1
             region2, new_index_Host2 = get_new_region2(Host_2_Input, session_id) # gets region of new punctuation for host 2
 
+            if not region1.strip() and not region2.strip():
+                return
+
         elif SessionType == "Client":
+
             region, new_index = get_new_region(english_text, session_id)         # gets region of new punctuation for single host
+
+            if not region.strip():
+                return
 
         else:
             print(f"the fuck did you enter? {SessionType}")
-            return
-
-        if not region and region1 and region2:
             return
 
     async with websockets.connect(f"ws://127.0.0.1:8000/ws/{session_id}") as ws:
@@ -143,7 +157,7 @@ async def punctuate(session_id: str):
             if SessionType == "Client": # send websocket to single client
                 await ws.send(json.dumps({
                     "source": "punctuate",
-                    "payload": {"english_punctuated": punctuated_region, "sessionID": session_id} # MAJOR TODO update frontend to ignore non matching sessionIDs
+                    "payload": {"english_punctuated": punctuated_region, "sessionID": session_id}
                 }))
 
             elif SessionType == "CoClient":
@@ -190,13 +204,13 @@ async def loop():
                 sql_text("SELECT session_id, english_transcript FROM sessions WHERE last_updated >= :cutoff"),
                 {"cutoff": cutoff}
             ).fetchall()
-            db.close()
+
 
             resultsDos = db.execute( # MAJOR : validate if this works, im not sure my sql is right here
                 sql_text("SELECT session_id, Host1_in_transcript, Host2_in_transcript FROM sessions WHERE last_updated >= :cutoff"),
                 {"cutoff": cutoff}
             ).fetchall()
-
+        db.close()
 
         # Process each active session
         for sid, english in results:

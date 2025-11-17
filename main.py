@@ -1,7 +1,11 @@
-# Main file. run with unicorn,
+# Main file. run with unicorn in terminal, uvicorn main:app --host 0.0.0.0 --port 8000,
+# to run the whole app. run uvicorn, then run punctuator and translator as regular python files, should be the whole wuite if you run npm run dev in the vscode frontend
+#
 #
 # TODOs are put in order of severity, majors are breaking whole function bugs, level 10s are the most important non-fuctional bugs
 # level 1s are trival non functionals
+#
+#
 #
 # Way the wind blows:
 #
@@ -22,15 +26,15 @@ import json
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from DBStuffs.db import (
-    SessionLocal, update_english, update_translation,
-    update_punctuated, init_db, update_host_prefs, update_translation_target, update_CoClient_Input
-)
+from DBStuffs.db import *
+# from SessionManager import SessionManager
 from analyticTools.timelog import time_block
+from queues import punctuate_queue, translate_queue
 
 SESSION_LOCKS = {}
 BUFFER_STORE = {}
 IS_PUNCTUATING = False
+# session_manager = SessionManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -78,7 +82,7 @@ manager = ConnectionManager()
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     db = SessionLocal()
-    global IS_PUNCTUATING # make session specific
+    # global IS_PUNCTUATING # make session specific
 
     try:
 
@@ -100,12 +104,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
                     english_text = payload.get("english", "")
 
-                    if IS_PUNCTUATING: # TODO make session specific
+                    if IS_PUNCTUATING: # TODO ::: LEVEL 3 ::: make session specific maybe an array?
 
                         BUFFER_STORE[session_id] = BUFFER_STORE.get(session_id, "") + " " + english_text # WTF does this even do
 
-                    else:
-                        update_english(db, session_id, english_text)
+
+                    update_english(db, session_id, english_text)
 
                 await manager.broadcast(session_id, msg)
 
@@ -118,24 +122,36 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     # Input_Lang  = payload.get("Host_Lang_Input", "")
                     # Output_Lang = payload.get("Host_Lang_Output", "")
 
-                    if IS_PUNCTUATING: # TODO make session specific
-                        BUFFER_STORE[session_id] = BUFFER_STORE.get(session_id, "") + " " + Input_Text # WTF does this even do
+                if IS_PUNCTUATING: # TODO ::: LEVEL 3 ::: make session specific maybe an array?
+                    BUFFER_STORE[session_id] = BUFFER_STORE.get(session_id, "") + " " + Input_Text # WTF does this even do
 
-                    else:
-                       update_CoClient_Input(db, session_id, Input_Text, Client_Num) # TODO add Update_CoClient_Input method to db.py to update backend with Host_Num 1 being host 1 etc...
+                else:
+                    update_CoClient_Input(db, session_id, Input_Text, Client_Num) # TODO add Update_CoClient_Input method to db.py to update backend with Host_Num 1 being host 1 etc...
 
+
+                #
                 await manager.broadcast(session_id, msg)
 
             elif source == "Viewer":
 
+                with time_block(session_id, "Viewer_init", "update_english"):
 
+                    initViewer(db, session_id)
 
-                return #TODO LEVEL 7 :::  make the logic for the viewer connecting to the session -
-                       #TODO and any other details needed for the user not already defined in the client section
+                await manager.broadcast(session_id, msg)
 
-            elif source == "disconnect":
+                return # TODO LEVEL 7 :::  make the logic for the viewer connecting to the session -
+                       # TODO and any other details needed for the user not already defined in the client section
 
-                return #TODO LEVEL 5 ::: make the logic for all sessions disconnects
+            elif source == "viewer_lang_change":
+
+                return # TODO LEVEL 7 :::manage lang change for viewer
+
+            elif source == "disconnect": #if host, set archived.
+                # if coclient, set archived to true and inform the other client with coHostDisconnect broadcast via websocket
+                # if viewer get lang, and set lang json to current - 1 (update_translation_target(db,session_ID, lan, false))
+
+                return # TODO LEVEL 5 ::: make the logic for all sessions disconnects
 
             # --- TRANSLATION UPDATE ---
             elif source == "translate":

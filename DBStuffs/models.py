@@ -1,7 +1,6 @@
 from sqlalchemy import Column, String, Text, JSON, DateTime, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
-
 from sqlalchemy.ext.mutable import MutableDict
 
 Base = declarative_base()
@@ -29,7 +28,10 @@ class HostSession(SessionData):
     english_transcript    = Column(Text, default="")
     punctuated_transcript = Column(Text, default="")
     translations          = Column(JSON, default=lambda: {"es": "", "fr": "", "de": "", "en": "", "ht": "", "it": "", "zh": "" })
-    translation_targets   = Column(MutableDict.as_mutable(JSON), default=lambda: {"en": False, "es": True, "fr": False, "de": False, "it": False, "ht": False, "zh": False})
+
+    # TODO ::: LEVEL 5 make the viewer session everytime it connects, add 1 to the data value, if it sees its 0 it will stop translating,
+    # TODO ::: LEVEL 5 if it sees it > 1, it will keep translating. if a viewer joins it will go from 1 -> 2, if a viewer leaves, it will go from 1 -> 0
+    translation_targets   = Column(MutableDict.as_mutable(JSON), default=lambda: {"en": 0, "es": 1, "fr": 0, "de": 0, "it": 0, "ht": 0, "zh": 0})
     input_lang            = Column(String, default="en-US")
     output_lang           = Column(String, default="English")
 
@@ -51,7 +53,7 @@ class CoClientSession(SessionData):
 class ViewerSession(SessionData):
     __mapper_args__ = {"polymorphic_identity": "Viewer"}
 
-    viewer_notes = Column(Text, default="")
+    Viewer_lang = Column(Text, default="en")  # english default for host 1 input language
     # Add whatever Viewer fields you need here.
 
 # to do,

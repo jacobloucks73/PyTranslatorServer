@@ -1,11 +1,12 @@
 import os
 from sqlalchemy.orm import Session
-from models import SessionData, HostSession, ViewerSession, CoClientSession
+# from models import *
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from models import Base
+# from models import Base
 import json
 import websockets
+from DBStuffs.models import *
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'app.db')}"
@@ -40,7 +41,7 @@ def get_or_create_session(db: Session, session_id: str, DB_Type: str):
 
     cls = type_map.get(DB_Type)
     if cls is None:
-        raise ValueError(f"Unknown session type '{DB_Type}'. Must be Host, CoClient, or Viewer.")
+        raise ValueError(f"Unknown session type '{DB_Type}'. Must be Client, CoClient, or Viewer.")
 
     # ✅ Create the correct subclass
     session = cls(
@@ -124,37 +125,54 @@ def update_flag(db: Session, session_id: str, choser:int, flag:bool):
     db.commit()
 
 def update_translation_target(db: Session, session_id: str, lan:str, flag:bool):
+    # session = get_or_create_session(db, session_id, "update_translation_target")
+    # if   lan == "en":
+    #     # newNum = session.translation_targets.get(lan)
+    #     session.translation_targets.update({"en": flag})
+    #     print(f"english language selected with flag: {flag} for session ID: {session_id}")
+    # elif lan == "es":
+    #     session.translation_targets.update({"es": flag})
+    #     print(f"spanish language selected with flag: {flag} for session ID: {session_id}")
+    # elif lan == "fr":
+    #     session.translation_targets.update({"fr": flag})
+    #     print(f"french language selected with flag: {flag} for session ID: {session_id}")
+    # elif lan == "de":
+    #     session.translation_targets.update({"de": flag})
+    #     print(f"german language selected with flag: {flag} for session ID: {session_id}")
+    # elif lan == "ht":
+    #     session.translation_targets.update({"ht": flag})
+    #     print(f"haitian language selected with flag: {flag} for session ID: {session_id}")
+    # elif lan == "it":
+    #     session.translation_targets.update({"it": flag})
+    #     print(f"Italian language selected with flag: {flag} for session ID: {session_id}")
+    # elif lan == "zh":
+    #     session.translation_targets.update({"zh": flag})
+    #     print(f"japanese language selected with flag: {flag} for session ID: {session_id}")
+    # else:
+    #     print("!!!!!! language switch not enabled, lan not found !!!!!!")
+
     session = get_or_create_session(db, session_id, "update_translation_target")
-    if   lan == "en":
-        session.translation_targets.update({"en": flag})
-        print(f"english language selected with flag: {flag} for session ID: {session_id}")
-    elif lan == "es":
-        session.translation_targets.update({"es": flag})
-        print(f"spanish language selected with flag: {flag} for session ID: {session_id}")
-    elif lan == "fr":
-        session.translation_targets.update({"fr": flag})
-        print(f"french language selected with flag: {flag} for session ID: {session_id}")
-    elif lan == "de":
-        session.translation_targets.update({"de": flag})
-        print(f"german language selected with flag: {flag} for session ID: {session_id}")
-    elif lan == "ht":
-        session.translation_targets.update({"ht": flag})
-        print(f"haitian language selected with flag: {flag} for session ID: {session_id}")
-    elif lan == "it":
-        session.translation_targets.update({"it": flag})
-        print(f"Italian language selected with flag: {flag} for session ID: {session_id}")
-    elif lan == "zh":
-        session.translation_targets.update({"zh": flag})
-        print(f"japanese language selected with flag: {flag} for session ID: {session_id}")
-    else:
+
+    if lan not in session.translation_targets:
         print("!!!!!! language switch not enabled, lan not found !!!!!!")
+        return
+
+    # Get current value
+    current_value = session.translation_targets.get(lan, 0)
+
+    # Compute new value (True = +1, False = -1)
+    delta = 1 if flag else -1
+    new_value = current_value + delta
+
+    # Update the stored value
+    session.translation_targets[lan] = new_value
 
     session.last_updated = datetime.utcnow()
 
     db.commit()
 
 def update_host_prefs(db: Session, session_id: str, choser: int, lan:str):
-     session = get_or_create_session(db, session_id,"update_host_prefs")
+     session = get_or_create_session(db, session_id,"Client")
      if   choser == 1 and lan != "":
          session.input_lang = lan
      elif choser == 2 and lan != "":
@@ -198,7 +216,7 @@ def update_CoClient_Lang(db: Session, session_id: str, Input_Lang: str,Output_La
 
 def update_CoClient_Input(db: Session, session_id: str, Input_Text: str, Client_Num: int):
 
-    session = get_or_create_session(db, session_id, "Co-Client_Input")
+    session = get_or_create_session(db, session_id, "CoClient")
 
     if Client_Num == 1:
 
@@ -212,6 +230,15 @@ def update_CoClient_Input(db: Session, session_id: str, Input_Text: str, Client_
 
         print(f"the fuck did you enter? {Client_Num}")
         return
+
+    session.active_session = True
+    db.commit()
+
+def initViewer(db: Session, session_id: str):
+
+    session = get_or_create_session(db, session_id, "Viewer")
+
+    # TODO ::: LEVEL 6 ::: make the lang update on the host side when the viewer connects so the host starts
 
     session.active_session = True
     db.commit()
