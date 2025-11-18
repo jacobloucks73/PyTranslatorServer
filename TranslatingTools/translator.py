@@ -1,3 +1,5 @@
+import os
+
 from analyticTools.timelog import time_block
 import asyncio, json, websockets
 from DBStuffs.db import SessionLocal, get_or_create_session
@@ -17,9 +19,15 @@ last_punct_word_index3 = {}  # this and the below are for handle incoming
 last_punct_word_index4 = {} # nothing like a temp fix that becomes permanent, get new regions quick fix for multi hosts
 
 # Path to service account credentials
+# credentials = service_account.Credentials.from_service_account_file(
+#     'C:/Users/jacob/Downloads/pyserver-476603-8560f519ac75.json' # path to json file with API key for google translate
+#     # #TODO make this a relative path for Loveland and server build
+# )
+
+GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+
 credentials = service_account.Credentials.from_service_account_file(
-    'C:/Users/jacob/Downloads/pyserver-476603-8560f519ac75.json' # path to json file with API key for google translate
-    # #TODO make this a relative path for Loveland and server build
+    GOOGLE_CREDENTIALS_PATH
 )
 
 # Initialize the Translate client
@@ -174,7 +182,7 @@ def replace_section(session_id: str, old_text: str, new_text: str, overlap_words
 # Main loop for a single session
 # -------------------------------------------------------
 async def translator_session(session_id: str):
-    uri = f"ws://127.0.0.1:8000/ws/{session_id}"
+    uri = f"wss://smugalpaca.com/ws/{session_id}"
 
     async with websockets.connect(uri) as ws:
         print(f"🌎 Translator connected for session {session_id}")

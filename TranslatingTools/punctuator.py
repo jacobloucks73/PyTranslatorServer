@@ -62,9 +62,6 @@ def get_new_region2(full_text, session_id):
         new_index = len(words)
     return region, new_index
 
-##
-## TODO MAJOR ::: Add dual punctuating for dual host sessions
-##
 
 async def punctuate(session_id: str):
 
@@ -122,7 +119,7 @@ async def punctuate(session_id: str):
             print(f"the fuck did you enter? {SessionType}")
             return
 
-    async with websockets.connect(f"ws://127.0.0.1:8000/ws/{session_id}") as ws:
+    async with websockets.connect(f"wss://smugalpaca.com/ws/{session_id}") as ws:
         # --- lock writes ---
         with time_block(session_id, "punctuate", "ws_lock"): # timing gates, Ignore
             await ws.send(json.dumps({"source": "lock"})) # very confused on why this is here? for buffer locks maybe?
