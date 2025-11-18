@@ -1,8 +1,8 @@
 {
   "type": "service_account",
   "project_id": "pyserver-476603",
-  "private_key_id": "8560f519ac75b7dc2c2f22ec73300fcaeffcda86",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCxkCrzTJG9Bln2\nwtJ+7OLlHdSyd2/pKB7TBDFFikoCI3ylfS+zZ3VET/DDHZkwGsyI+o3AggTLwFZ9\nMXDT1IgKcu2K0rcHNRdBRzdJp3cj4Zu/d5DTMdok9EBg/vDuSkk5rQ2FmZIU+Glf\n+WxA/BvTPq4V34BRcO2gR6xWYlrPPm4nbhtNDA/8S7sFpNGTlxZ6zQNkjEENAXx6\nrl6bLhxIjLc2QutxDFvM1iVYjKo4YwiAtupQhR7CvHzFESA1UlpxOuUT7DeTmSNF\n8US8Z+EFN9suEOHt7YWt645XSW+87RJsoX32UZi4plwXGPlftCFJBTrloUqlx2Wr\n4emJMGoFAgMBAAECggEAAxyYLBhY63ubgwAKCVBkb4h0zEXcj7T0yVTm+iWAw4XU\nrt/BQL8c5nwSJ5EyuI2XrQTbDBcbN2jg+yOtKwEr+yblc8vaikVLaYjydpd5NodD\nH/lb79+NR52CLVD6buqdWuXl+UPmM/jge96Wn5Lrd+m+ykJW8NZuS6NF6WOi3MPf\nUY0jNhZ8uvpZm9hWw2yCqofPqAAQ0uFW7Eb/1B9jPhwLJROlfIvZf/0HMwPBi0wU\nH4UBAwsrWuSOTdRj3rPYbot9cQNyLQZnG7EBP38bRfYYoE6DiXQGmaF34Y5di8fE\n7XEZek88KQjeB/mW1a7dY5g0LEoVcYO09JzxwMxOlwKBgQDn4vwx8OIeYMEXOajd\ncpAjAoPquTcvZ9iIxKO7p/M6eBs+2vDS8OOOGAqSWYaL4sdPQralWCl6SdfHvyR1\nl1Wkr2Y3rMES/hKvYJux81xQha7ncp9m0FP8709A3Nkbe5tZTkGSK8P5Ml9qxtg7\nFsK5zJzukWAjTX0mvtkPPOnFXwKBgQDEBwvD3NgRmfadgxuUx+r1BWLMs91Mub3k\nhyN3WJneBotFECN+4UTEYWywTES9eQWeXGYEGIbLzNW6nwNblCGubQjzR/zZXKsX\nCYe9P1NjriZpOMsCiMzmjOOEMdR/6TQkglbM1BcoqLV8cBnHQG2nlCAhbCixvlgv\nB1vpn70HGwKBgQDLXWJYWi20/p3ZRJQ4QjTuv1H6FR200ZoxuGLwPMcvzA34/gKe\nvOyUvbjnyOQa4nRxqsyMDdmyifhYEeZjyqktmTZINZXOlkzEyjFBy3B2ngdarEfn\n32UJOseC1y0A0VLY66zOCNwCPI86EdGpYLi+QhiPkaeCzn6n8FBk8MMEeQKBgFo7\ngA/lXVQk0d9JVW3T5HRqyUK+3HQP37gM+KdcEl+gFYVx21TxLq1SxywTv2SUC6EM\nmSzzeUDghdVEktAZzLM0n3UUwu/u9xZAncngF2t/41B2AwSkoeTSH3xfT5idaRIR\nKRFZ41sk5X1lQIh2QMNtrKiV19mRa5giRA2zKNjXAoGAE330RryPgRxR3f3sZo9s\n9oKLlUQyNfipPsT7MPhSK0rW4l/6tcmRh7PsGwiK/+k0R0aqgsC8AzDNWb2423eg\n+isPx2CAw761fCWmPY7suWwzRUSmYDU5c8PLymCJjPAu5wIExvqWd5earEJIXXQ4\nXEogPcQ0N1FNsNjjYfFDeh0=\n-----END PRIVATE KEY-----\n",
+  "private_key_id": "",
+  "private_key": "-----BEGIN PRIVATE KEY-----\n-----END PRIVATE KEY-----\n",
   "client_email": "pyserver@pyserver-476603.iam.gserviceaccount.com",
   "client_id": "106111527317422099545",
   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
