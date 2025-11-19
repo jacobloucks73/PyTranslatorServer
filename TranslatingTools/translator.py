@@ -21,7 +21,7 @@ last_punct_word_index4 = {} # nothing like a temp fix that becomes permanent, ge
 # Path to service account credentials
 # credentials = service_account.Credentials.from_service_account_file(
 #     'C:/Users/jacob/Downloads/pyserver-476603-8560f519ac75.json' # path to json file with API key for google translate
-#     # #TODO make this a relative path for Loveland and server build
+#     #  make this a relative path for Loveland and server build
 # )
 
 GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
