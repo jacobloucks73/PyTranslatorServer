@@ -36,10 +36,13 @@ SESSION_LOCKS = {}
 BUFFER_STORE = {}
 IS_PUNCTUATING = False
 # session_manager = SessionManager()
-logger = logging.getLogger("main")
-handler = logging.FileHandler("main.log")
-logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logging.basicConfig(
+    filename="Main.log",
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    force=True
+)
+logging.debug(">>> main.py logging initialized")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
