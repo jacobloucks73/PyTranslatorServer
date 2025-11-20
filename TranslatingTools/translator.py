@@ -8,14 +8,24 @@ from datetime import datetime
 # from deep_translator import GoogleTranslator
 from google.cloud import translate_v2 as translate # for official Google Translate, need API key for test run
 from google.oauth2 import service_account
+import logging
+
+# Configure logging
+
+logging.basicConfig(filename='Translator.log', level=logging.DEBUG)
+
+# Log messages
+
+logging.debug('Reached Translator')
+
 
 INTERVAL = 5                # seconds between live updates
 CONTEXT_WORDS = 15          # how many words before new chunk for context
 active_sessions = {}        # idk what this does and im to lazy to look
 
 last_punct_word_index1 = {}  # this and the below are for the periodic translation
-last_punct_word_index2 = {} # nothing like a temp fix that becomes permanent, get new regions quick fix for multi hosts
-last_punct_word_index3 = {}  # this and the below are for handle incoming
+last_punct_word_index2 = {} # nothing like a temp fix that becomes permanent, get new regions quick fix for multi hostslast_punct_word_index3 = {}  # this and the below are for handle incoming
+last_punct_word_index3 = {}
 last_punct_word_index4 = {} # nothing like a temp fix that becomes permanent, get new regions quick fix for multi hosts
 
 # Path to service account credentials
@@ -72,7 +82,7 @@ async def translate_text(session_id: str, text_chunk: str, target_lang: str):
     if not text_chunk.strip():
         return ""
 
-    print(f"Translating: {text_chunk} → {target_lang} @ {datetime.now()}")
+    logging.debug(f"Translating: {text_chunk} → {target_lang} @ {datetime.now()}")
     loop = asyncio.get_event_loop()
 
     # time_block: measure full Google API round trip
@@ -94,7 +104,7 @@ async def translate_text(session_id: str, text_chunk: str, target_lang: str):
             return translated_text.strip()
 
         except Exception as e:
-            print(f"❌ Translation error: {e}")
+            logging.debug(f"❌ Translation error: {e}")
             return
 
 # -------------------------------------------------------
@@ -152,7 +162,7 @@ def get_new_region(full_text, session_id, yudodis):
         start_index = last_punct_word_index4.get(session_id, 0)
 
     else:
-        print(f"getting here shouldn't be possible : ( : {yudodis}")
+        logging.debug(f"getting here shouldn't be possible : ( : {yudodis}")
 
     if len(words) <= start_index:
         return "",   start_index
@@ -185,7 +195,7 @@ async def translator_session(session_id: str):
     uri = f"wss://smugalpaca.com/ws/{session_id}"
 
     async with websockets.connect(uri) as ws:
-        print(f"🌎 Translator connected for session {session_id}")
+        logging.debug(f"🌎 Translator connected for session {session_id}")
         # TODO find out why Periodic translations arent going through like periodic punctuates, either get rid of and just do punctuates and translates or vice versa Level 3
         async def periodic_translation():
             global updated_txt_Host_1, updated_txt_Host_2
@@ -201,7 +211,7 @@ async def translator_session(session_id: str):
                         SessionType = (session.session_type or "").strip()  # gets session type for use in later calls to DB and Websocket
 
                         if SessionType == "Client":  # if the session is a single client, do normal shit and things
-                            print("1")
+                            logging.debug("1")
                             english_text = (session.english_transcript or "").strip() #  input text already in the DB, doesnt have to be english
                             targets = dict(session.translation_targets or {})         # TODO : LEVEL 3 : has to be a better way to do this, list of active translation targets, currently never gets revised after the language ends use
                             current_translations = dict(session.translations or {})   # list of translation texts from the translation list
@@ -218,7 +228,7 @@ async def translator_session(session_id: str):
                             Host_2_Out_Lang = (session.Host2_lang_out or "en")              # gets the second hosts translated language (what host 2 wants to see on their screen)
 
                         else:
-                            print(f"the fuck did you enter? {SessionType}")
+                            logging.debug(f"the fuck did you enter? {SessionType}")
                             return
 
                     finally:
@@ -232,11 +242,11 @@ async def translator_session(session_id: str):
                         region2, new_index_Host2 = get_new_region(Host_2_Input, session_id,2)   # gets region of new punctuation for host 2
 
                     elif SessionType == "Client":
-                        print("2")
+                        logging.debug("2")
                         region, new_index = get_new_region(english_text, session_id,1)           # gets region of new punctuation for single host
 
                     else:
-                        print(f"the fuck did you enter? {SessionType}")
+                        logging.debug(f"the fuck did you enter? {SessionType}")
                         return
 
                     if not region and not  region1 and not region2:
@@ -247,11 +257,11 @@ async def translator_session(session_id: str):
 
                 # 3. Translate into each active language
                 if SessionType == "Client":
-                    print("3")
+                    logging.debug("3")
                     for lang_code, is_active in targets.items():
                         if is_active > 0 :
 
-                            print("4")
+                            logging.debug("4")
                             # translation call
                             with time_block(session_id, "periodic_translation", f"translate_{lang_code}"): # timing gates, Ignore
 
@@ -293,7 +303,7 @@ async def translator_session(session_id: str):
 
                 else:
 
-                    print(f"the fuck did you enter? {SessionType}")
+                    logging.debug(f"the fuck did you enter? {SessionType}")
                     return
 
 
@@ -303,7 +313,7 @@ async def translator_session(session_id: str):
                     db = SessionLocal()
 
                     if SessionType == "Client":
-                        print("5")
+                        logging.debug("5")
                         try:
                             session = get_or_create_session(db, session_id, "Translate_Client_Call") # change to get session method
                             session.translations = current_translations
@@ -324,11 +334,11 @@ async def translator_session(session_id: str):
                             db.close()
 
                     else:
-                        print(f"the fuck did you enter? {SessionType}")
+                        logging.debug(f"the fuck did you enter? {SessionType}")
                         return
 
                 if SessionType == "Client":
-                    print("6")
+                    logging.debug("6")
                     last_punct_word_index1[session_id] = new_index  # last index for single host gets saved as such
 
                 elif SessionType == "CoClient":
@@ -338,7 +348,7 @@ async def translator_session(session_id: str):
 
                 else:
 
-                    print(f"the fuck did you enter? {SessionType}")
+                    logging.debug(f"the fuck did you enter? {SessionType}")
                     return
 
                 # 6. Sleep until next cycle
@@ -368,13 +378,13 @@ async def translator_session(session_id: str):
 
                     if not Host_1_Punctuated and not Host_2_Punctuated:
 
-                        print("ERROR : how the fuck you get here? ")
+                        logging.debug("ERROR : how the fuck you get here? ")
                         return
 
                 else:
 
                     SessionType = "Client"  # we know the message is a single host client at this point
-                    print("7")
+                    logging.debug("7")
                 # find delta of punctuated region
                 with time_block(session_id, "handle_incoming", "get_region_punctuated"): # timing gates, Ignore
 
@@ -384,17 +394,17 @@ async def translator_session(session_id: str):
                         region2, new_index_Host2 = get_new_region(Host_2_Punctuated, session_id,4)  # gets region of new punctuation for host 2
 
                     elif SessionType == "Client":
-                        print("8")
+                        logging.debug("8")
                         region, new_index = get_new_region(english_punct, session_id,3)  # gets region of new punctuation for single host
 
                     else:
 
-                        print(f"ERROR : the fuck did you enter? {SessionType}")
+                        logging.debug(f"ERROR : the fuck did you enter? {SessionType}")
                         return
 
                     if not region and not region1 and not region2:
 
-                        print(f"ERROR : the fuck did you enter? {region} + {region1} + {region2}")
+                        logging.debug(f"ERROR : the fuck did you enter? {region} + {region1} + {region2}")
                         return
 
                 # the fuck is this bullshit?
@@ -410,7 +420,7 @@ async def translator_session(session_id: str):
                         session = get_or_create_session(db, session_id, "Translate_handle_incoming")
 
                         if SessionType == "Client":
-                            print("9")
+                            logging.debug("9")
                             targets = dict(session.translation_targets or {})
                             current_translations = dict(session.translations or {})
 
@@ -427,14 +437,14 @@ async def translator_session(session_id: str):
 
                         else:
 
-                            print(f"the fuck did you enter? {SessionType}")
+                            logging.debug(f"the fuck did you enter? {SessionType}")
                             return
 
                     finally:
                         db.close()
 
                 if SessionType == "Client":
-                    print("10")
+                    logging.debug("10")
                     for lang_code, is_active in targets.items():
 
                         if is_active > 0:
@@ -470,13 +480,13 @@ async def translator_session(session_id: str):
 
                 else:
 
-                    print(f"the fuck did you enter? {SessionType}")
+                    logging.debug(f"the fuck did you enter? {SessionType}")
                     return
 
                 db = SessionLocal()
 
                 if SessionType == "Client":
-                    print("12")
+                    logging.debug("12")
                     try:
                         session = get_or_create_session(db, session_id, "Translate_Client_Call")  # change to get session method
                         session.translations = current_translations
@@ -497,11 +507,11 @@ async def translator_session(session_id: str):
                         db.close()
 
                 else:
-                    print(f"the fuck did you enter? {SessionType}")
+                    logging.debug(f"the fuck did you enter? {SessionType}")
                     return
 
                 if SessionType == "Client":
-                    print("13")
+                    logging("13")
                     last_punct_word_index3[session_id] = new_index  # last index for single host gets saved as such
 
                 elif SessionType == "CoClient":
@@ -511,7 +521,7 @@ async def translator_session(session_id: str):
 
                 else:
 
-                    print(f"the fuck did you enter? {SessionType}")
+                    logging.debug(f"the fuck did you enter? {SessionType}")
                     return
 
         await asyncio.gather(periodic_translation(), handle_incoming())
@@ -524,7 +534,7 @@ async def safe_translator_session(sid):
         db.close()
         await translator_session(sid)
     except Exception as e:
-        print(f"⚠️ Translator for {sid} crashed: {e}")
+        logging.debug(f"⚠️ Translator for {sid} crashed: {e}")
     finally:
         if sid in active_sessions:
             del active_sessions[sid]
@@ -547,13 +557,13 @@ async def manager_loop():
             db.close()
 
             for SessionID, LastUpdated in results:
-                print("session ID : " + SessionID + ". last updated : " + LastUpdated)
+                logging.debug("session ID : " + SessionID + ". last updated : " + LastUpdated)
                 # TODO get periodic translation working by adding logic here to continue filtering session data by cutoff time
                 # if last updated = current - 60 secs, make inactive
                 task = asyncio.create_task(safe_translator_session(SessionID))
                 active_sessions[SessionID] = task
             for SessionID, LastUpdated in resultsDos:
-                print("session ID : " + SessionID + ". last updated : " + LastUpdated)
+                logging.debug("session ID : " + SessionID + ". last updated : " + LastUpdated)
                 # TODO get periodic translation working by adding logic here to continue filtering session data by cutoff time
                 # if last updated = current - 60 secs, make inactive
                 # then call periodic translator here

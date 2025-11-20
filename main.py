@@ -23,18 +23,20 @@
 # Footlocker is the bane of my existence
 
 import json
+import logging
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from DBStuffs.db import *
 # from SessionManager import SessionManager
 from analyticTools.timelog import time_block
-from queues import punctuate_queue, translate_queue
+# from queues import punctuate_queue, translate_queue
 
 SESSION_LOCKS = {}
 BUFFER_STORE = {}
 IS_PUNCTUATING = False
 # session_manager = SessionManager()
+logging.basicConfig(filename='Main.log', level=logging.DEBUG)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -59,7 +61,7 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket, session_id: str):
         await websocket.accept()
         self.active_connections.setdefault(session_id, []).append(websocket)
-        print(f" Connected to session {session_id}")
+        logging.debug(f" Connected to session {session_id}")
 
     def disconnect(self, websocket: WebSocket, session_id: str):
         if session_id in self.active_connections:
@@ -67,14 +69,14 @@ class ConnectionManager:
             except ValueError: pass
             if not self.active_connections[session_id]:
                 del self.active_connections[session_id]
-        print(f" Disconnected from session {session_id}")
+        logging.debug(f" Disconnected from session {session_id}")
 
     async def broadcast(self, session_id: str, message: dict):
         for connection in list(self.active_connections.get(session_id, [])):
             try:
                 await connection.send_json(message)
             except Exception as e:
-                print(f" Send failed for {session_id}: {e}")
+                logging.debug(f" Send failed for {session_id}: {e}")
                 self.disconnect(connection, session_id)
 
 manager = ConnectionManager()
@@ -96,6 +98,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 msg = json.loads(raw)
                 source = msg.get("source")
                 payload = msg.get("payload", {})
+                logging.debug("Source of message into main WS call list : " + source)
 
             # --- CLIENT SPEECH ---
             if source == "client":
@@ -103,11 +106,11 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 with time_block(session_id, "client", "update_english"):
 
                     english_text = payload.get("english", "")
-
+                    logging.debug("what client received : " + english_text)
                     if IS_PUNCTUATING: # TODO ::: LEVEL 3 ::: make session specific maybe an array?
 
                         BUFFER_STORE[session_id] = BUFFER_STORE.get(session_id, "") + " " + english_text # WTF does this even do
-
+                    logging.debug("what Update english received : " + db + ",  " + session_id + ",  " +  english_text)
                     update_english(db, session_id, english_text)
 
                 await manager.broadcast(session_id, msg)

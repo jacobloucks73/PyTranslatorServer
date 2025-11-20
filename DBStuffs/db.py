@@ -7,6 +7,11 @@ from sqlalchemy.orm import sessionmaker
 import json
 import websockets
 from DBStuffs.models import *
+import logging
+
+# Configure logging
+
+logging.basicConfig(filename='DB.log', level=logging.DEBUG)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'app.db')}"
@@ -23,7 +28,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def init_db():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-    print("Database initialized (tables ensured).")
+    logging.debug("Database initialized (tables ensured).")
     #  creates tables if they don't exist
 
 from datetime import datetime
@@ -56,7 +61,7 @@ def get_or_create_session(db: Session, session_id: str, DB_Type: str):
     db.commit()
     db.refresh(session)
 
-    print(f"Created new {DB_Type} session: {session_id}")
+    logging.debug(f"Created new {DB_Type} session: {session_id}")
     return session
 
 # -------------------------------------------------
@@ -129,32 +134,32 @@ def update_translation_target(db: Session, session_id: str, lan:str, flag:bool):
     # if   lan == "en":
     #     # newNum = session.translation_targets.get(lan)
     #     session.translation_targets.update({"en": flag})
-    #     print(f"english language selected with flag: {flag} for session ID: {session_id}")
+    #     logging.debug(f"english language selected with flag: {flag} for session ID: {session_id}")
     # elif lan == "es":
     #     session.translation_targets.update({"es": flag})
-    #     print(f"spanish language selected with flag: {flag} for session ID: {session_id}")
+    #     logging.debug(f"spanish language selected with flag: {flag} for session ID: {session_id}")
     # elif lan == "fr":
     #     session.translation_targets.update({"fr": flag})
-    #     print(f"french language selected with flag: {flag} for session ID: {session_id}")
+    #     logging.debug(f"french language selected with flag: {flag} for session ID: {session_id}")
     # elif lan == "de":
     #     session.translation_targets.update({"de": flag})
-    #     print(f"german language selected with flag: {flag} for session ID: {session_id}")
+    #     logging.debug(f"german language selected with flag: {flag} for session ID: {session_id}")
     # elif lan == "ht":
     #     session.translation_targets.update({"ht": flag})
-    #     print(f"haitian language selected with flag: {flag} for session ID: {session_id}")
+    #     logging.debug(f"haitian language selected with flag: {flag} for session ID: {session_id}")
     # elif lan == "it":
     #     session.translation_targets.update({"it": flag})
-    #     print(f"Italian language selected with flag: {flag} for session ID: {session_id}")
+    #     logging.debug(f"Italian language selected with flag: {flag} for session ID: {session_id}")
     # elif lan == "zh":
     #     session.translation_targets.update({"zh": flag})
-    #     print(f"japanese language selected with flag: {flag} for session ID: {session_id}")
+    #     logging.debug(f"japanese language selected with flag: {flag} for session ID: {session_id}")
     # else:
-    #     print("!!!!!! language switch not enabled, lan not found !!!!!!")
+    #     logging.debug("!!!!!! language switch not enabled, lan not found !!!!!!")
 
     session = get_or_create_session(db, session_id, "update_translation_target")
 
     if lan not in session.translation_targets:
-        print("!!!!!! language switch not enabled, lan not found !!!!!!")
+        logging.debug("!!!!!! language switch not enabled, lan not found !!!!!!")
         return
 
     # Get current value
@@ -208,7 +213,7 @@ def update_CoClient_Lang(db: Session, session_id: str, Input_Lang: str,Output_La
 
     else:
 
-        print(f"the fuck did you enter? {Client_Num}")
+        logging.debug(f"the fuck did you enter? {Client_Num}")
         return
 
     session.active_session = True
@@ -228,7 +233,7 @@ def update_CoClient_Input(db: Session, session_id: str, Input_Text: str, Client_
 
     else:
 
-        print(f"the fuck did you enter? {Client_Num}")
+        logging.debug(f"the fuck did you enter? {Client_Num}")
         return
 
     session.active_session = True
