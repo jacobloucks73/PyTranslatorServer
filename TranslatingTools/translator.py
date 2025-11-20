@@ -12,7 +12,11 @@ import logging
 
 # Configure logging
 
-logging.basicConfig(filename='Translator.log', level=logging.DEBUG)
+logging.basicConfig(
+    filename='translator.log',
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+)
 
 # Log messages
 
@@ -511,7 +515,7 @@ async def translator_session(session_id: str):
                     return
 
                 if SessionType == "Client":
-                    logging("13")
+                    logging.debug("13")
                     last_punct_word_index3[session_id] = new_index  # last index for single host gets saved as such
 
                 elif SessionType == "CoClient":

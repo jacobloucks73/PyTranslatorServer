@@ -10,8 +10,11 @@ import logging
 
 # Configure logging
 
-logging.basicConfig(filename='Translator.log', level=logging.DEBUG)
-
+logging.basicConfig(
+    filename='punctuator.log',
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+)
 # Log messages
 
 logging.debug('Reached punctuator')

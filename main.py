@@ -36,13 +36,17 @@ SESSION_LOCKS = {}
 BUFFER_STORE = {}
 IS_PUNCTUATING = False
 # session_manager = SessionManager()
-logging.basicConfig(filename='Main.log', level=logging.DEBUG)
+logging.basicConfig(
+    filename='Main.log',
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     yield
-    print(" Shutting down gracefully...")
+    logging.debug(" Shutting down gracefully...")
 
 app = FastAPI(lifespan=lifespan)
 

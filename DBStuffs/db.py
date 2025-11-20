@@ -11,7 +11,11 @@ import logging
 
 # Configure logging
 
-logging.basicConfig(filename='DB.log', level=logging.DEBUG)
+logging.basicConfig(
+    filename='DB.log',
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'app.db')}"
