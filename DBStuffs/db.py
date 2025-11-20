@@ -71,6 +71,7 @@ def get_or_create_session(db: Session, session_id: str, DB_Type: str):
 # Append English text instead of overwriting
 # -------------------------------------------------
 def update_english(db: Session, session_id: str, new_text: str):
+    init_db()
     session = get_or_create_session(db, session_id, DB_Type="Client")
     logging.debug("Updated english text for session " + session_id)
     if session.english_transcript:
