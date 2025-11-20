@@ -27,6 +27,9 @@ import logging
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from sqlalchemy import text
+from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError
 from DBStuffs.db import *
 # from SessionManager import SessionManager
 from analyticTools.timelog import time_block
@@ -94,6 +97,14 @@ manager = ConnectionManager()
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     db = SessionLocal()
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+            logging.debug("Engine connection OK")
+    except OperationalError as e:
+        logging.error(f"Engine connection FAILED: {e}")
+
     global IS_PUNCTUATING # make session specific
 
     try:
@@ -120,8 +131,10 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     if IS_PUNCTUATING: # TODO ::: LEVEL 3 ::: make session specific maybe an array?
 
                         BUFFER_STORE[session_id] = BUFFER_STORE.get(session_id, "") + " " + english_text # WTF does this even do
-                    logging.debug("what Update english received : " + db + ",  " + session_id + ",  " +  english_text)
+
+                    logging.debug("what Update english received : " +  session_id + ",  " +  english_text)
                     update_english(db, session_id, english_text)
+                    logging.debug("what client received : " + english_text)
 
                 await manager.broadcast(session_id, msg)
 
