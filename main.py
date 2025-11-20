@@ -36,11 +36,10 @@ SESSION_LOCKS = {}
 BUFFER_STORE = {}
 IS_PUNCTUATING = False
 # session_manager = SessionManager()
-logging.basicConfig(
-    filename='Main.log',
-    level=logging.DEBUG,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-)
+logger = logging.getLogger("main")
+handler = logging.FileHandler("main.log")
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -61,11 +60,13 @@ app.add_middleware(
 class ConnectionManager:
     def __init__(self):
         self.active_connections: dict[str, list[WebSocket]] = {}
+        logging.debug("reached line 64")
 
     async def connect(self, websocket: WebSocket, session_id: str):
         await websocket.accept()
         self.active_connections.setdefault(session_id, []).append(websocket)
         logging.debug(f" Connected to session {session_id}")
+        logging.debug("reached line 70")
 
     def disconnect(self, websocket: WebSocket, session_id: str):
         if session_id in self.active_connections:
@@ -74,6 +75,7 @@ class ConnectionManager:
             if not self.active_connections[session_id]:
                 del self.active_connections[session_id]
         logging.debug(f" Disconnected from session {session_id}")
+        logging.debug("reached line 79")
 
     async def broadcast(self, session_id: str, message: dict):
         for connection in list(self.active_connections.get(session_id, [])):
@@ -82,6 +84,7 @@ class ConnectionManager:
             except Exception as e:
                 logging.debug(f" Send failed for {session_id}: {e}")
                 self.disconnect(connection, session_id)
+                logging.debug("reached line 88")
 
 manager = ConnectionManager()
 
@@ -91,7 +94,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     global IS_PUNCTUATING # make session specific
 
     try:
-
+        logging.debug("reached line 98")
         await manager.connect(websocket, session_id)
 
         while True:
