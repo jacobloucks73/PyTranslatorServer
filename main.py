@@ -99,11 +99,24 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     db = SessionLocal()
 
     try:
+        result = db.execute(text("SELECT 1")).scalar()
+        logging.debug(f"DB TEST OK — returned: {result}")
+    except Exception as e:
+        logging.error(f"DB TEST FAILED — cannot connect: {e}")
+
+    try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
             logging.debug("Engine connection OK")
     except OperationalError as e:
         logging.error(f"Engine connection FAILED: {e}")
+
+    try:
+        db = SessionLocal()
+        count = db.query(SessionData).count()
+        logging.debug(f"DB TEST OK — SessionData rows: {count}")
+    except Exception as e:
+        logging.error(f"DB TEST FAILED — cannot query SessionData: {e}")
 
     global IS_PUNCTUATING # make session specific
 
@@ -166,7 +179,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 await manager.broadcast(session_id, msg)
 
                 return # TODO LEVEL 7 :::  make the logic for the viewer connecting to the session -
-                       # TODO and any other details needed for the user not already defined in the client section
+                # TODO and any other details needed for the user not already defined in the client section
 
             elif source == "viewer_lang_change":
 
