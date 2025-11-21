@@ -10,7 +10,7 @@ from google.cloud import translate_v2 as translate # for official Google Transla
 from google.oauth2 import service_account
 import logging
 
-# Configure logger
+# Configure loggerf
 logger = logging.getLogger("translator")
 handler = logging.FileHandler("translator.log")
 formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
