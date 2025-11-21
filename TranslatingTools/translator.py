@@ -240,7 +240,8 @@ async def translator_session(session_id: str):
 
                 # 2. Figure out what's new to translate
                 with time_block(session_id, "periodic_translation", "region_extract"): # timing gates, Ignore
-
+                    region1 = ""
+                    region2 = ""
                     if SessionType == "CoClient":
                         region1, new_index_Host1 = get_new_region(Host_1_Input, session_id,1)    # gets region of new punctuation for host 1
                         region2, new_index_Host2 = get_new_region(Host_2_Input, session_id,2)   # gets region of new punctuation for host 2
@@ -391,7 +392,8 @@ async def translator_session(session_id: str):
                     logger.debug("7")
                 # find delta of punctuated region
                 with time_block(session_id, "handle_incoming", "get_region_punctuated"): # timing gates, Ignore
-
+                    region1 = ""
+                    region2 = ""
                     if SessionType == "CoClient":
 
                         region1, new_index_Host1 = get_new_region(Host_1_Punctuated, session_id, 3)  # gets region of new punctuation for host 1
