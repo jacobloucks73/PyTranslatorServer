@@ -562,17 +562,18 @@ async def manager_loop():
             ).fetchall()
             db.close()
 
-            for SessionID, LastUpdated in results:
-                logger.debug("session ID : " + SessionID + ". last updated : " + LastUpdated)
-                # TODO get periodic translation working by adding logic here to continue filtering session data by cutoff time
-                # if last updated = current - 60 secs, make inactive
+            session_ids = {sid for (sid, _) in results} | {sid for (sid, _) in resultsDos}
+
+            for SessionID in session_ids:
+                existing = active_sessions.get(SessionID)
+
+                # If we already have a running task for this session, skip
+                if existing is not None and not existing.done():
+                    continue
+
+                logger.debug(f"Spawning translator task for session {SessionID}")
                 task = asyncio.create_task(safe_translator_session(SessionID))
                 active_sessions[SessionID] = task
-            for SessionID, LastUpdated in resultsDos:
-                loggerlogger.debug("session ID : " + SessionID + ". last updated : " + LastUpdated)
-                # TODO get periodic translation working by adding logic here to continue filtering session data by cutoff time
-                # if last updated = current - 60 secs, make inactive
-                # then call periodic translator here
 
 
         await asyncio.sleep(INTERVAL)
