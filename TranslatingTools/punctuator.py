@@ -16,7 +16,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 # Log messages
 
-logging.debug('Reached punctuator')
+logger.debug('Reached punctuator')
 ##
 ## MAJOR TODO Integrate this into main.py to parallelize the punctuate functions for different sessions
 ## TODO might need to copy current objects after initial deeplanguagemodel cause it costs thirty seconds each time
@@ -84,11 +84,11 @@ async def punctuate(session_id: str):
         SessionType = (session.session_type or "").strip()        # gets session type for use in later calls to DB and Websocket
 
         if SessionType == "Client": # if bitches want to party alone
-            logging.debug("1")
+            logger.debug("1")
             english_text = (session.english_transcript or "").strip() # gets english text from DB
 
             if not english_text:
-                logging.debug(f"⚠️ No text to punctuate for {session_id}")
+                logger.debug(f"⚠️ No text to punctuate for {session_id}")
                 return
 
         elif SessionType == "CoClient": # if bitches want to party with someone else
@@ -97,12 +97,12 @@ async def punctuate(session_id: str):
             Host_2_Input = (session.Host2_in_transcript or "").strip()  # gets Host input 2 from DB
 
             if not Host_1_Input.strip() and not Host_2_Input.strip():
-                logging.debug(f"⚠️ No text to punctuate for {session_id}")
+                logger.debug(f"⚠️ No text to punctuate for {session_id}")
                 return
 
         else:
 
-            logging.debug(f"the fuck did you enter? {SessionType}")
+            logger.debug(f"the fuck did you enter? {SessionType}")
             return
 
         db.close() # after path has been chosen, close DB
@@ -119,14 +119,14 @@ async def punctuate(session_id: str):
                 return
 
         elif SessionType == "Client":
-            logging.debug("2")
+            logger.debug("2")
             region, new_index = get_new_region(english_text, session_id)         # gets region of new punctuation for single host
 
             if not region.strip():
                 return
 
         else:
-            logging.debug(f"the fuck did you enter? {SessionType}")
+            logger.debug(f"the fuck did you enter? {SessionType}")
             return
 
     async with websockets.connect(f"wss://smugalpaca.com/ws/{session_id}") as ws:
@@ -134,10 +134,10 @@ async def punctuate(session_id: str):
         with time_block(session_id, "punctuate", "ws_lock"): # timing gates, Ignore
             await ws.send(json.dumps({"source": "lock"})) # very confused on why this is here? for buffer locks maybe?
 
-        logging.debug(f"Locked writes for {session_id}")
+        logger.debug(f"Locked writes for {session_id}")
 
         # --- punctuation model ---
-        logging.debug(f"Running punctuation for {SessionType}, {session_id}...")
+        logger.debug(f"Running punctuation for {SessionType}, {session_id}...")
 
         try:
             with time_block(session_id, "punctuate", "run_model"): # big time savings here
@@ -147,15 +147,15 @@ async def punctuate(session_id: str):
                     punctuated_region2 = model.restore_punctuation(region2)  # brains for punctuating host 2s region
 
                 elif SessionType == "Client":
-                    logging.debug("3")
+                    logger.debug("3")
                     punctuated_region = model.restore_punctuation(region)  # brains for punctuating single host region
 
                 else:
-                    logging.debug(f"the fuck did you enter? {SessionType}")
+                    logger.debug(f"the fuck did you enter? {SessionType}")
                     return
 
         except Exception as e:
-            logging.debug(f"❌ Punctuation error: {e}")
+            logger.debug(f"❌ Punctuation error: {e}")
             await ws.send(json.dumps({"source": "unlock"}))
             return
 
@@ -163,7 +163,7 @@ async def punctuate(session_id: str):
         with time_block(session_id, "punctuate", "ws_send_punctuated"): # timing gates, Ignore
 
             if SessionType == "Client": # send websocket to single client
-                logging.debug("4")
+                logger.debug("4")
                 await ws.send(json.dumps({
                     "source": "punctuate",
                     "payload": {"english_punctuated": punctuated_region, "sessionID": session_id}
@@ -183,18 +183,18 @@ async def punctuate(session_id: str):
                 }))
 
             else:
-                logging.debug(f"the fuck did you enter? {SessionType}")
+                logger.debug(f"the fuck did you enter? {SessionType}")
                 return
 
-            logging.debug(f" Sent new punctuated region for {session_id}")
+            logger.debug(f" Sent new punctuated region for {session_id}")
 
         # --- unlock ---
         with time_block(session_id, "punctuate", "ws_unlock"): # timing gates, Ignore
             await ws.send(json.dumps({"source": "unlock"}))
-        logging.debug(f" Unlocked writes for {session_id}")
+        logger.debug(f" Unlocked writes for {session_id}")
 
     if SessionType == "Client":
-        logging.debug("5")
+        logger.debug("5")
         last_punct_word_index[session_id] = new_index # last index for single host gets saved as such
 
     elif SessionType == "CoClient":
@@ -202,7 +202,7 @@ async def punctuate(session_id: str):
         last_punct_word_index2[session_id] = new_index_Host2 # last index for host 2 gets saved as such
 
     else:
-        logging.debug(f"the fuck did you enter? {SessionType}")
+        logger.debug(f"the fuck did you enter? {SessionType}")
         return
 
 
