@@ -31,7 +31,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def init_db():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-    logging.debug("Database initialized (tables ensured).")
+    logger.debug("Database initialized (tables ensured).")
     #  creates tables if they don't exist
 
 from datetime import datetime
@@ -64,24 +64,24 @@ def get_or_create_session(db: Session, session_id: str, DB_Type: str):
     db.commit()
     db.refresh(session)
 
-    logging.debug(f"Created new {DB_Type} session: {session_id}")
+    logger.debug(f"Created new {DB_Type} session: {session_id}")
     return session
 
 # -------------------------------------------------
 # Append English text instead of overwriting
 # -------------------------------------------------
 def update_english(db: Session, session_id: str, new_text: str):
-    logging.debug("reached db.py update_english")
+    logger.debug("reached db.py update_english")
     init_db()
-    logging.debug("reached db.py get or create session")
+    logger.debug("reached db.py get or create session")
     session = get_or_create_session(db, session_id, DB_Type="Client")
-    logging.debug("Updated english text for session " + session_id)
+    logger.debug("Updated english text for session " + session_id)
     if session.english_transcript:
         session.english_transcript += " " + new_text.strip()
     else:
         session.english_transcript = new_text.strip()
 
-    logging.debug("Updated english text for session : " + session.english_transcript)
+    logger.debug("Updated english text for session : " + session.english_transcript)
     #  refresh last_updated and mark active if text incoming
     session.last_updated = datetime.utcnow()
     session.active_session = True
@@ -142,32 +142,32 @@ def update_translation_target(db: Session, session_id: str, lan:str, flag:bool):
     # if   lan == "en":
     #     # newNum = session.translation_targets.get(lan)
     #     session.translation_targets.update({"en": flag})
-    #     logging.debug(f"english language selected with flag: {flag} for session ID: {session_id}")
+    #     logger.debug(f"english language selected with flag: {flag} for session ID: {session_id}")
     # elif lan == "es":
     #     session.translation_targets.update({"es": flag})
-    #     logging.debug(f"spanish language selected with flag: {flag} for session ID: {session_id}")
+    #     logger.debug(f"spanish language selected with flag: {flag} for session ID: {session_id}")
     # elif lan == "fr":
     #     session.translation_targets.update({"fr": flag})
-    #     logging.debug(f"french language selected with flag: {flag} for session ID: {session_id}")
+    #     logger.debug(f"french language selected with flag: {flag} for session ID: {session_id}")
     # elif lan == "de":
     #     session.translation_targets.update({"de": flag})
-    #     logging.debug(f"german language selected with flag: {flag} for session ID: {session_id}")
+    #     logger.debug(f"german language selected with flag: {flag} for session ID: {session_id}")
     # elif lan == "ht":
     #     session.translation_targets.update({"ht": flag})
-    #     logging.debug(f"haitian language selected with flag: {flag} for session ID: {session_id}")
+    #     logger.debug(f"haitian language selected with flag: {flag} for session ID: {session_id}")
     # elif lan == "it":
     #     session.translation_targets.update({"it": flag})
-    #     logging.debug(f"Italian language selected with flag: {flag} for session ID: {session_id}")
+    #     loggerlogger.debug(f"Italian language selected with flag: {flag} for session ID: {session_id}")
     # elif lan == "zh":
     #     session.translation_targets.update({"zh": flag})
-    #     logging.debug(f"japanese language selected with flag: {flag} for session ID: {session_id}")
+    #     logger.debug(f"japanese language selected with flag: {flag} for session ID: {session_id}")
     # else:
-    #     logging.debug("!!!!!! language switch not enabled, lan not found !!!!!!")
+    #     logger.debug("!!!!!! language switch not enabled, lan not found !!!!!!")
 
     session = get_or_create_session(db, session_id, "update_translation_target")
 
     if lan not in session.translation_targets:
-        logging.debug("!!!!!! language switch not enabled, lan not found !!!!!!")
+        logger.debug("!!!!!! language switch not enabled, lan not found !!!!!!")
         return
 
     # Get current value
@@ -221,7 +221,7 @@ def update_CoClient_Lang(db: Session, session_id: str, Input_Lang: str,Output_La
 
     else:
 
-        logging.debug(f"the fuck did you enter? {Client_Num}")
+        logger.debug(f"the fuck did you enter? {Client_Num}")
         return
 
     session.active_session = True
@@ -241,7 +241,7 @@ def update_CoClient_Input(db: Session, session_id: str, Input_Text: str, Client_
 
     else:
 
-        logging.debug(f"the fuck did you enter? {Client_Num}")
+        logger.debug(f"the fuck did you enter? {Client_Num}")
         return
 
     session.active_session = True
