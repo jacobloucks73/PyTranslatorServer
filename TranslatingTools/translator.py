@@ -465,7 +465,7 @@ async def translator_session(session_id: str):
                                 # push back out to clients
                                 await ws.send(json.dumps({
                                     "source": "translate",
-                                    "payload": {"lang": lang_code, "translated": updated_txt}
+                                    "payload": {"lang": lang_code, "translated": updated_txt, "sessionID": session_id}
                                 }))
 
 
