@@ -51,7 +51,7 @@ logging.debug(">>> main.py logging initialized")
 async def lifespan(app: FastAPI):
     init_db()
     yield
-    logging.debug(" Shutting down gracefully...")
+   # logging.debug(" Shutting down gracefully...")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -121,7 +121,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
     global IS_PUNCTUATING # make session specific
 
     try:
-        logging.debug("reached line 98")
+        logging.debug("reached line 124")
         await manager.connect(websocket, session_id)
 
         while True:
