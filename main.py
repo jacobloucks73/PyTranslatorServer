@@ -22,6 +22,7 @@
 # Sugarbear is love, Sugarbear is life
 # Footlocker is the bane of my existence
 
+import asyncio
 import json
 import logging
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -34,6 +35,7 @@ from DBStuffs.db import *
 # from SessionManager import SessionManager
 from analyticTools.timelog import time_block
 # from queues import punctuate_queue, translate_queue
+from RedisBus import subscribe, publish
 
 SESSION_LOCKS = {}
 BUFFER_STORE = {}
@@ -74,6 +76,7 @@ class ConnectionManager:
         logging.debug(f" Connected to session {session_id}")
         logging.debug("reached line 70")
 
+
     def disconnect(self, websocket: WebSocket, session_id: str):
         if session_id in self.active_connections:
             try: self.active_connections[session_id].remove(websocket)
@@ -93,6 +96,42 @@ class ConnectionManager:
                 logging.debug("reached line 88")
 
 manager = ConnectionManager()
+
+async def handle_translate_event(db, session_id: str, payload: dict):
+    """
+    Shared logic for translation events, regardless of origin (WS or Redis).
+    """
+    with (time_block(session_id, "translate", "update_translation")):
+        # Build a WS-friendly message for clients
+        msg = {
+            "source": "translate",
+            "payload": payload
+        }
+    await manager.broadcast(session_id, msg)
+
+
+async def handle_punctuate_event(db, session_id: str, payload: dict):
+    """
+    Shared logic for punctuation events, regardless of origin (WS or Redis).
+    """
+    global IS_PUNCTUATING, BUFFER_STORE
+
+    IS_PUNCTUATING = False  # still global right now; eventually per-session
+
+    with time_block(session_id, "punctuate", "update_punctuated"):
+        punctuated_text = payload.get("english_punctuated", "")
+        await update_punctuated(db, session_id, punctuated_text, "punctuate")
+
+    if session_id in BUFFER_STORE and BUFFER_STORE[session_id].strip():
+        with time_block(session_id, "punctuate", "flush_buffer"):
+            buffered = BUFFER_STORE.pop(session_id).strip()
+            update_english(db, session_id, buffered)
+
+    msg = {
+        "source": "punctuate",
+        "payload": payload
+    }
+    await manager.broadcast(session_id, msg)
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
@@ -124,6 +163,25 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         logging.debug("reached line 124")
         await manager.connect(websocket, session_id)
 
+        async def translation_listener():
+            async for msg in subscribe("translation_output"):
+                if msg.get("sessionID") == session_id:
+                    await manager.broadcast(session_id, {
+                        "source": "translate",
+                        "payload": msg
+                    })
+
+        async def punctuate_listener():
+            async for msg in subscribe("punctuate_output"):
+                if msg.get("sessionID") == session_id:
+                    await manager.broadcast(session_id, {
+                        "source": "punctuate",
+                        "payload": msg
+                    })
+
+        translate_task = asyncio.create_task(translation_listener())
+        punct_task = asyncio.create_task(punctuate_listener())
+
         while True:
 
             with time_block(session_id, "websocket_endpoint", "receive"):
@@ -135,19 +193,34 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 logging.debug("Source of message into main WS call list : " + source)
 
             # --- CLIENT SPEECH ---
+            # if source == "client":
+            #
+            #     with time_block(session_id, "client", "update_english"):
+            #
+            #         english_text = payload.get("english", "")
+            #         logging.debug("what client received : " + english_text)
+            #         if IS_PUNCTUATING: # TODO ::: LEVEL 3 ::: make session specific maybe an array?
+            #
+            #             BUFFER_STORE[session_id] = BUFFER_STORE.get(session_id, "") + " " + english_text # WTF does this even do
+            #
+            #         logging.debug("what Update english received : " +  session_id + ",  " +  english_text)
+            #         update_english(db, session_id, english_text)
+            #         logging.debug("what client received : " + english_text)
+            #
+            #     await manager.broadcast(session_id, msg)
+
             if source == "client":
 
-                with time_block(session_id, "client", "update_english"):
+                english_text = payload.get("english", "")
+                logging.debug("what client received : " + english_text)
+                update_english(db, session_id, english_text)
 
-                    english_text = payload.get("english", "")
-                    logging.debug("what client received : " + english_text)
-                    if IS_PUNCTUATING: # TODO ::: LEVEL 3 ::: make session specific maybe an array?
-
-                        BUFFER_STORE[session_id] = BUFFER_STORE.get(session_id, "") + " " + english_text # WTF does this even do
-
-                    logging.debug("what Update english received : " +  session_id + ",  " +  english_text)
-                    update_english(db, session_id, english_text)
-                    logging.debug("what client received : " + english_text)
+                await publish("raw_speech_input", {
+                    "session_id": session_id,
+                    "payload": {
+                        "english": english_text
+                    }
+                })
 
                 await manager.broadcast(session_id, msg)
 
@@ -191,29 +264,26 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
                 return # TODO LEVEL 5 ::: make the logic for all sessions disconnects
 
-            # --- TRANSLATION UPDATE ---
-            elif source == "translate":
-                with time_block(session_id, "translate", "update_translation"):
-                    update_translation(
-                        db, session_id,
-                        msg["payload"].get("lang", "es"),
-                        msg["payload"].get("translated", "")
-                    )
-                await manager.broadcast(session_id, msg)
+            # elif source == "translate":
+            #     with time_block(session_id, "translate", "update_translation"):
+            #         update_translation(
+            #             db, session_id,
+            #             msg["payload"].get("lang", "es"),
+            #             msg["payload"].get("translated", "")
+            #         )
+            #     await manager.broadcast(session_id, msg)
+            #
+            # elif source == "punctuate":
+            #     IS_PUNCTUATING = False # make session specific
+            #     with time_block(session_id, "punctuate", "update_punctuated"):
+            #         punctuated_text = msg["payload"].get("english_punctuated", "")
+            #         await update_punctuated(db, session_id, punctuated_text,"punctuate")
+            #     if session_id in BUFFER_STORE and BUFFER_STORE[session_id].strip():
+            #         with time_block(session_id, "punctuate", "flush_buffer"):
+            #             buffered = BUFFER_STORE.pop(session_id).strip()
+            #             update_english(db, session_id, buffered)
+            #     await manager.broadcast(session_id, msg)
 
-            # --- PUNCTUATE UPDATE ---
-            elif source == "punctuate":
-                IS_PUNCTUATING = False # make session specific
-                with time_block(session_id, "punctuate", "update_punctuated"):
-                    punctuated_text = msg["payload"].get("english_punctuated", "")
-                    await update_punctuated(db, session_id, punctuated_text,"punctuate")
-                if session_id in BUFFER_STORE and BUFFER_STORE[session_id].strip():
-                    with time_block(session_id, "punctuate", "flush_buffer"):
-                        buffered = BUFFER_STORE.pop(session_id).strip()
-                        update_english(db, session_id, buffered)
-                await manager.broadcast(session_id, msg)
-
-            # --- HOST LANGUAGE UPDATE ---
             elif source == "host_lang_update":
                 with time_block(session_id, "host_lang_update", "update_prefs"):
                     payload = msg.get("payload", {})
@@ -223,7 +293,6 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     update_host_prefs(db, session_id, 2, new_output)
                 await manager.broadcast(session_id, msg)
 
-            # --- TRANSLATION TARGET CHANGE ---
             elif source == "translation_target_change":
                 with time_block(session_id, "translation_target_change", "update_flag"):
                     payload = msg.get("payload", {})
@@ -232,13 +301,15 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     update_translation_target(db, session_id, language, flag)
                 await manager.broadcast(session_id, msg)
 
-            # --- LOCK CONTROL ---
             elif source == "lock":
                 IS_PUNCTUATING = True # make session specific
+
             elif source == "unlock":
                 IS_PUNCTUATING = False # make session specific
 
     except WebSocketDisconnect:
         manager.disconnect(websocket, session_id)
+        translate_task.cancel()
+        punct_task.cancel()
     finally:
         db.close()
